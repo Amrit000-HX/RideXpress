@@ -1,0 +1,124 @@
+/* HowItWorks.css */
+.how {
+  background: var(--pearl);
+  padding: 120px 48px;
+}
+.how-header { margin-bottom: 72px; }
+
+.capabilities-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 32px;
+  align-items: start;
+}
+.cap-left  { grid-column: 1 / 5; }
+.cap-right { grid-column: 5 / 13; }
+
+.cap-left-lbl {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 48px;
+  display: block;
+}
+
+.steps-list { display: flex; flex-direction: column; }
+.step-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--border);
+  cursor: crosshair;
+}
+.step-item:first-child { border-top: 1px solid var(--border); }
+
+.step-line {
+  width: 40px; height: 1px;
+  background: var(--muted);
+  margin-right: 20px;
+  margin-top: 10px;
+  flex-shrink: 0;
+  transition: width 0.45s var(--ease-expo), background 0.3s ease;
+}
+.step-item:hover .step-line { width: 64px; background: var(--accent); }
+
+.step-num {
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  color: var(--accent);
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 4px;
+}
+.step-title {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--charcoal);
+}
+.step-desc {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--warm-grey);
+  line-height: 1.55;
+  margin-top: 3px;
+}
+
+/* Right: Large editorial headline */
+.cap-heading {
+  font-family: var(--font-display);
+  font-size: clamp(2.4rem, 4.8vw, 5rem);
+  font-weight: 600;
+  line-height: 1.15;
+  color: var(--charcoal);
+  letter-spacing: -0.02em;
+}
+.cap-heading em {
+  font-style: italic;
+  font-weight: 400;
+  color: var(--muted);
+  font-size: 0.85em;
+}
+.cap-heading .cr { color: var(--accent); }
+
+.cap-sub {
+  margin-top: 28px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.85;
+  color: var(--warm-grey);
+  max-width: 480px;
+}
+
+.cap-cta {
+  margin-top: 44px;
+  display: inline-block;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  background: var(--accent);
+  color: var(--white);
+  padding: 15px 36px;
+  border: 1px solid var(--accent);
+  cursor: crosshair;
+  transition: background 0.4s ease, color 0.4s ease, border-color 0.4s ease;
+}
+.cap-cta:hover { background: transparent; color: var(--accent); }
+
+@media (max-width: 1024px) {
+  .how { padding: 80px 32px; }
+  .capabilities-grid { grid-template-columns: 1fr; }
+  .cap-left, .cap-right { grid-column: 1 / -1; }
+}
+@media (max-width: 768px) {
+  .how { padding: 80px 24px; }
+}

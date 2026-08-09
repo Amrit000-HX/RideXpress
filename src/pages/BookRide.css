@@ -1,0 +1,593 @@
+/* ═══════════════════════════════════════════════════════
+   BookRide.css — Stacking Cards Vehicle Selector
+   Palette: Cream #F5F0E8 · Sage-Green #6B9E72 · Charcoal #1A1A1A
+   ═══════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Archivo+Black&family=Space+Mono:wght@400;700&display=swap');
+
+/* ── Page root ──────────────────────────────────────── */
+.bk-page {
+  background: #1A1A1A;
+  /* NOTE: Do NOT use overflow-x:hidden here — it silently creates a new
+     scroll container and breaks position:sticky on all descendants. */
+  font-family: 'Inter', sans-serif;
+}
+
+/* ── Intro section (scrolls away before stacking begins) */
+.bk-page-intro {
+  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 120px 80px 80px;
+  background: #1A1A1A;
+  border-bottom: 1px solid rgba(245,240,232,0.06);
+}
+.bk-intro-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #6B9E72;
+  margin-bottom: 20px;
+}
+.bk-intro-heading {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(3rem, 8vw, 8rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.04em;
+  line-height: 0.88;
+  color: #F5F0E8;
+  margin: 0 0 24px;
+}
+.bk-intro-sub {
+  font-family: 'Inter', sans-serif;
+  font-size: 16px;
+  color: rgba(245,240,232,0.4);
+  line-height: 1.7;
+  max-width: 400px;
+  margin-bottom: 40px;
+}
+.bk-scroll-hint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(245,240,232,0.3);
+}
+
+/* ═══════════════════════════════════════════════════════
+   STACKING VIEWPORT
+   ═══════════════════════════════════════════════════════ */
+.bk-sticky-viewport {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ═══════════════════════════════════════════════════════
+   CARD LAYOUT
+   ═══════════════════════════════════════════════════════ */
+.bk-card-grid {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  grid-template-columns: 52% 48%;
+  overflow: hidden;
+}
+
+/* ── Left info column ───────────────────────────────── */
+.bk-card-left {
+  padding: 52px 60px 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  justify-content: center;
+  position: relative;
+  z-index: 2;
+}
+
+.bk-card-toprow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bk-card-num {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+}
+
+.bk-card-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.bk-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  border: 1px solid;
+  padding: 4px 10px;
+  border-radius: 50px;
+}
+
+/* Giant vehicle name */
+.bk-card-name {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(2.8rem, 6.5vw, 7.5rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.04em;
+  line-height: 0.88;
+  margin: 0;
+  /* Subtle text-shadow for depth */
+  text-shadow: 0 1px 2px rgba(0,0,0,0.06);
+}
+
+.bk-card-tagline {
+  font-family: 'Playfair Display', serif;
+  font-style: italic;
+  font-size: clamp(1rem, 1.4vw, 1.25rem);
+  line-height: 1.4;
+  margin: 0;
+}
+
+/* Price */
+.bk-price-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.bk-price {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(2rem, 3.5vw, 3.5rem);
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  line-height: 1;
+}
+.bk-price-unit {
+  font-family: 'Space Mono', monospace;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* Feature chips */
+.bk-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.bk-chip {
+  font-family: 'Inter', sans-serif;
+  font-size: 11px;
+  font-weight: 400;
+  padding: 5px 12px;
+  border-radius: 50px;
+  border: 1px solid;
+  white-space: nowrap;
+}
+
+/* Services */
+.bk-services {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 4px;
+  border-top: 1px solid;
+}
+.bk-svc-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.bk-svc-tag {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 50px;
+  border: 1px solid;
+}
+
+/* Select button */
+.bk-select-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 13px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  border: none;
+  padding: 16px 36px;
+  cursor: crosshair;
+  align-self: flex-start;
+  margin-top: 4px;
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              gap 0.25s ease, box-shadow 0.25s ease;
+}
+.bk-select-btn:hover {
+  transform: translate(-4px, -4px);
+  gap: 18px;
+  box-shadow: 4px 4px 0px currentColor;
+}
+
+/* ── Right image column ─────────────────────────────── */
+.bk-card-right {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.bk-vehicle-img {
+  width: 88%;
+  max-height: 75%;
+  object-fit: contain;
+  filter: drop-shadow(0 24px 48px rgba(0,0,0,0.18));
+  transform: rotate(-6deg) scale(1.05) translateX(5%);
+  transition: transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.bk-card-grid:hover .bk-vehicle-img {
+  transform: rotate(-3deg) scale(1.08) translateX(4%);
+}
+
+/* Placeholder for missing image */
+.bk-no-img {
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  border: 3px dashed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  opacity: 0.45;
+}
+.bk-no-img-char {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 6rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.06em;
+}
+.bk-no-img-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+/* Giant background watermark number */
+.bk-watermark {
+  position: absolute;
+  bottom: -16px;
+  right: -8px;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(6rem, 14vw, 18rem);
+  font-weight: 900;
+  letter-spacing: -0.08em;
+  line-height: 1;
+  opacity: 0.05;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ── Progress strip at card bottom ─────────────────── */
+.bk-progress-strip {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  padding: 14px 60px;
+  border-top: 1px solid;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  z-index: 10;
+}
+.bk-prog-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.bk-prog-dots {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.bk-prog-dot {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  transition: background 0.3s ease, transform 0.3s ease;
+}
+
+/* ═══════════════════════════════════════════════════════
+   FIXED SIDE INDICATOR
+   ═══════════════════════════════════════════════════════ */
+.bk-side-indicator {
+  position: fixed;
+  right: 28px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+.bk-side-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: opacity 0.3s ease;
+}
+.bk-side-item:not(.bk-side-active) { opacity: 0.35; }
+.bk-side-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  transition: background 0.3s ease, transform 0.3s ease;
+  flex-shrink: 0;
+}
+.bk-side-active .bk-side-dot {
+  transform: scale(1.4);
+}
+.bk-side-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(245,240,232,0.5);
+  white-space: nowrap;
+}
+
+/* ═══════════════════════════════════════════════════════
+   LOCATION DRAWER
+   ═══════════════════════════════════════════════════════ */
+.bk-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 10, 10, 0.65);
+  backdrop-filter: blur(6px);
+  z-index: 500;
+  display: flex;
+  align-items: flex-end;
+}
+
+.bk-drawer {
+  width: 100%;
+  background: #F5F0E8;
+  border-radius: 28px 28px 0 0;
+  overflow: hidden;
+  box-shadow: 0 -16px 60px rgba(0,0,0,0.3);
+}
+
+.bk-drawer-handle {
+  width: 44px; height: 4px;
+  background: rgba(26,26,26,0.15);
+  border-radius: 2px;
+  margin: 14px auto;
+}
+
+.bk-drawer-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 32px 20px;
+  border-bottom: 1px solid rgba(26,26,26,0.08);
+}
+.bk-drawer-vehicle {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: clamp(1.3rem, 3vw, 1.8rem);
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: -0.02em;
+  color: #1A1A1A;
+  margin: 0 0 4px;
+}
+.bk-drawer-price {
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  color: #6B9E72;
+  letter-spacing: 0.08em;
+}
+.bk-close-btn {
+  width: 40px; height: 40px;
+  border-radius: 50%;
+  background: rgba(26,26,26,0.08);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #1A1A1A;
+  cursor: crosshair;
+  transition: background 0.2s ease;
+}
+.bk-close-btn:hover { background: rgba(26,26,26,0.14); }
+
+.bk-drawer-body {
+  padding: 24px 32px;
+}
+
+.bk-loc-track {
+  background: rgba(26,26,26,0.04);
+  border: 1px solid rgba(26,26,26,0.1);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.bk-loc-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+}
+.bk-loc-dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.bk-dot-green { background: #6B9E72; }
+.bk-dot-red   { background: #D46B6B; }
+
+.bk-loc-line {
+  height: 1px;
+  background: rgba(26,26,26,0.08);
+  margin: 0 20px;
+}
+
+.bk-loc-input {
+  flex: 1;
+  border: none;
+  background: none;
+  font-family: 'Inter', sans-serif;
+  font-size: 15px;
+  color: #1A1A1A;
+  outline: none;
+}
+.bk-loc-input::placeholder { color: rgba(26,26,26,0.3); }
+
+.bk-loc-icon {
+  color: rgba(26,26,26,0.3);
+  flex-shrink: 0;
+}
+
+.bk-drawer-foot {
+  padding: 0 32px 32px;
+}
+
+.bk-fare-est {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 0;
+  border-top: 1px solid rgba(26,26,26,0.08);
+  margin-bottom: 16px;
+}
+.bk-fare-label {
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(26,26,26,0.4);
+  margin-bottom: 4px;
+}
+.bk-fare-range {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: -0.02em;
+}
+.bk-fare-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #6B9E72;
+}
+
+.bk-confirm-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: #1A1A1A;
+  color: #F5F0E8;
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 14px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  border: none;
+  padding: 18px;
+  cursor: crosshair;
+  transition: background 0.25s ease, gap 0.25s ease;
+}
+.bk-confirm-btn:hover:not(:disabled) { background: #6B9E72; gap: 16px; }
+.bk-confirm-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* ═══════════════════════════════════════════════════════
+   SUCCESS TOAST
+   ═══════════════════════════════════════════════════════ */
+.bk-toast {
+  position: fixed;
+  bottom: 36px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #6B9E72;
+  color: #1A1A1A;
+  font-family: 'Space Mono', monospace;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 14px 28px;
+  border-radius: 50px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  z-index: 1000;
+  white-space: nowrap;
+  box-shadow: 0 8px 32px rgba(107,158,114,0.35);
+}
+
+/* ═══════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════ */
+@media (max-width: 900px) {
+  .bk-page-intro { padding: 100px 32px 60px; }
+  .bk-card-grid  { grid-template-columns: 1fr; }
+  .bk-card-right { display: none; }
+  .bk-card-left  { padding: 80px 32px 80px; justify-content: flex-end; }
+  .bk-card-name  { font-size: clamp(3rem, 14vw, 5.5rem); }
+  .bk-progress-strip { padding: 14px 32px; }
+  .bk-side-indicator { right: 16px; }
+}
+
+@media (max-width: 600px) {
+  .bk-page-intro { padding: 80px 24px 48px; }
+  .bk-card-left  { padding: 80px 24px 72px; gap: 14px; }
+  .bk-card-name  { font-size: clamp(2.5rem, 12vw, 4rem); }
+  .bk-drawer-head, .bk-drawer-body, .bk-drawer-foot { padding-left: 20px; padding-right: 20px; }
+  .bk-fare-range { font-size: 1.1rem; }
+  .bk-side-indicator { display: none; }
+}

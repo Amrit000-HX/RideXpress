@@ -1,0 +1,199 @@
+/* =====================================================
+   RIDEXPRESS — Global CSS
+   Color Palette: Silver/Grey, Cream+Charcoal, Sage-Green accent
+   Typography: Playfair Display (headlines) + Inter (body)
+   ===================================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=Inter:wght@300;400;500;600;700&display=swap');
+
+/* ── Design Tokens ──────────────────────────────────── */
+:root {
+  --silver:         #E8EAED;
+  --pearl:          #F4F5F7;
+  --cream:          #F5F0E8;
+  --charcoal:       #1C1C1E;
+  --near-black:     #0D0D0D;
+
+  /* Accent: cream blended with green — warm sage */
+  --accent:         #6B9E72;
+  --accent-dark:    #4E7A55;
+  --accent-light:   #A8C9AC;
+  --accent-glow:    rgba(107, 158, 114, 0.18);
+
+  /* Keep crimson as alias → accent so all var(--crimson) references work */
+  --crimson:        #6B9E72;
+  --crimson-dark:   #4E7A55;
+
+  --body-text:      #2E2E2E;
+  --muted:          #9A9A9A;
+  --border:         #C8CDD4;
+  --white:          #FFFFFF;
+  --warm-grey:      #6B6B6B;
+
+  /* Fonts */
+  --font-display:   'Playfair Display', Georgia, serif;
+  --font-body:      'Inter', system-ui, sans-serif;
+
+  --ease-expo:      cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out:       cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ── Reset ──────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  background: var(--near-black);
+  color: var(--body-text);
+  cursor: crosshair;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul, ol { list-style: none; }
+button { cursor: crosshair; }
+
+/* ── Custom Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--near-black); }
+::-webkit-scrollbar-thumb { background: var(--accent); border-radius: 2px; }
+
+/* ── Selection ──────────────────────────────────────── */
+::selection {
+  background: var(--accent);
+  color: var(--white);
+}
+
+/* ── Shared Section Utilities ───────────────────────── */
+.section-label {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-bottom: 14px;
+  display: block;
+}
+
+/* Headlines: Playfair Display, natural case, editorial weight */
+.section-heading {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 6vw, 5.5rem);
+  font-weight: 600;
+  line-height: 1.1;
+  color: var(--charcoal);
+  letter-spacing: -0.01em;
+}
+
+
+/* ── Design Tokens ──────────────────────────────────── */
+:root {
+  --silver:         #E8EAED;
+  --pearl:          #F4F5F7;
+  --cream:          #F5F0E8;
+  --charcoal:       #1C1C1E;
+  --near-black:     #0D0D0D;
+  --crimson:        #DC143C;
+  --crimson-dark:   #A50E2D;
+  --body-text:      #2E2E2E;
+  --muted:          #9A9A9A;
+  --border:         #C8CDD4;
+  --white:          #FFFFFF;
+  --warm-grey:      #6B6B6B;
+
+  --font-display:   'Anton', sans-serif;
+  --font-body:      'Plus Jakarta Sans', sans-serif;
+  --ease-expo:      cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out:       cubic-bezier(0.25, 0.46, 0.45, 0.94);
+}
+
+/* ── Reset ──────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  scroll-behavior: smooth;
+  font-size: 16px;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--near-black);
+  color: var(--body-text);
+  cursor: crosshair;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul, ol { list-style: none; }
+
+button { cursor: crosshair; }
+
+/* ── Custom Scrollbar ───────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: var(--near-black); }
+::-webkit-scrollbar-thumb { background: var(--crimson); border-radius: 2px; }
+
+/* ── Selection ──────────────────────────────────────── */
+::selection {
+  background: var(--crimson);
+  color: var(--white);
+}
+
+/* ── Shared Section Utilities ───────────────────────── */
+.section-label {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--muted);
+  border-top: 1px solid var(--border);
+  padding-top: 14px;
+  margin-bottom: 14px;
+  display: block;
+}
+
+.section-heading {
+  font-family: var(--font-display);
+  font-size: clamp(4rem, 8vw, 8rem);
+  line-height: 0.92;
+  text-transform: uppercase;
+  color: var(--charcoal);
+  letter-spacing: -0.01em;
+}
