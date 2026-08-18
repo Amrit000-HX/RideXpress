@@ -8,14 +8,14 @@
  * NEVER commit real credentials.
  */
 require('dotenv').config({ path: require('path').join(__dirname, '../.env') })
-const mongoose = require('mongoose')
-const bcrypt   = require('bcryptjs')
-const User     = require('../src/models/User')
+const mongoose  = require('mongoose')
+const bcrypt    = require('bcryptjs')
+const connectDB = require('../src/config/db')
+const User      = require('../src/models/User')
 
 const seed = async () => {
   try {
-    await mongoose.connect(process.env.MONGO_URI)
-    console.log('✅  Connected to MongoDB')
+    await connectDB()
 
     const email    = (process.env.ADMIN_EMAIL    || 'admin@ridexpress.com').toLowerCase()
     const name     = process.env.ADMIN_NAME      || 'Admin'
