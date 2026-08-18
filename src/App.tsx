@@ -9,11 +9,15 @@ import EmployeeForm from './pages/EmployeeForm'
 import EmployeeDashboard from './pages/EmployeeDashboard'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
+import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
 
 export default function App() {
   const location = useLocation()
-  const hideNavFooter = ['/login', '/register', '/parcel-form', '/employee-form', '/employee-dashboard'].includes(location.pathname)
+  const hideNavFooter = [
+    '/login', '/register', '/parcel-form',
+    '/employee-form', '/employee-dashboard',
+  ].includes(location.pathname)
 
   return (
     <AuthProvider>
@@ -23,10 +27,19 @@ export default function App() {
         <Route path="/book"        element={<BookRide />} />
         <Route path="/login"       element={<LoginPage />} />
         <Route path="/register"    element={<RegisterPage />} />
-        <Route path="/deliver"       element={<DeliverParcel />} />
-        <Route path="/parcel-form"  element={<ParcelForm />} />
-        <Route path="/employee-form"      element={<EmployeeForm />} />
-        <Route path="/employee-dashboard" element={<EmployeeDashboard />} />
+        <Route path="/deliver"     element={<DeliverParcel />} />
+        <Route path="/parcel-form" element={<ParcelForm />} />
+        <Route path="/employee-form" element={<EmployeeForm />} />
+
+        {/* Protected: only authenticated employees/admins */}
+        <Route
+          path="/employee-dashboard"
+          element={
+            <ProtectedRoute allowedRoles={['employee', 'admin']}>
+              <EmployeeDashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
       {!hideNavFooter && <Footer />}
     </AuthProvider>

@@ -467,3 +467,18 @@
   .lp-right-top  { padding: 20px 20px 0; }
   .lp-welcome    { font-size: 1.8rem; }
 }
+
+/* ── Error alert ─────────────────────────────────────── */
+.lp-error-alert {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 10px 14px;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}

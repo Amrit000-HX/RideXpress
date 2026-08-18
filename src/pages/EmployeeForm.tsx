@@ -17,6 +17,7 @@ import { useState, useRef, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import * as authService from '../services/authService'
 import {
   Camera, Upload, Calendar, Shield,
   ChevronDown, CheckCircle2, ArrowRight, ArrowLeft,
@@ -224,7 +225,7 @@ function Field({
 /* ── Main Onboarding Component ───────────────────────── */
 export default function EmployeeForm() {
   const navigate = useNavigate()
-  const { login } = useAuth()
+  const { loginWithCredentials } = useAuth()
 
   useEffect(() => { window.scrollTo(0, 0) }, [])
 
@@ -283,10 +284,31 @@ export default function EmployeeForm() {
     setSubmitted(true)
   }
 
-  const handleComplete = () => {
-    const vehLabel = VEHICLE_CATEGORIES.find(c => c.id === category)?.label || 'Vehicle'
-    localStorage.setItem('emp_vehicle', vehLabel)
-    login() // Authenticate the employee
+  const handleComplete = async () => {
+    const vehLabel  = VEHICLE_CATEGORIES.find(c => c.id === category)?.label || 'Vehicle'
+    const empName   = localStorage.getItem('emp_name')     || 'Employee'
+    const empEmail  = localStorage.getItem('emp_email')    || ''
+    const empPass   = localStorage.getItem('emp_password') || ''
+
+    try {
+      const result = await authService.registerEmployee({
+        name:            empName,
+        email:           empEmail,
+        password:        empPass,
+        vehicleCategory: vehLabel,
+        designation:     'Rider',
+        department:      'Delivery',
+      })
+      loginWithCredentials(result.token, result.user)
+      localStorage.setItem('emp_vehicle', vehLabel)
+      // Clean up temp registration data
+      localStorage.removeItem('emp_email')
+      localStorage.removeItem('emp_password')
+    } catch (err: any) {
+      // Even if API fails, still navigate (e.g., duplicate email on re-try)
+      // In production, surface this error to the user
+      console.error('[EmployeeForm] registerEmployee error:', err.message)
+    }
     navigate('/employee-dashboard')
   }
 

@@ -8,9 +8,10 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import gsap from 'gsap'
 import { useAuth } from '../contexts/AuthContext'
+import * as authService from '../services/authService'
 import {
   User, Mail, Phone, MapPin, Lock, Eye, EyeOff,
-  BadgeCheck, ArrowRight, Star
+  BadgeCheck, ArrowRight, Star, AlertCircle
 } from 'lucide-react'
 import './LoginPage.css'
 
@@ -190,15 +191,16 @@ function PasswordField({ value, onChange, show, toggle }: {
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login } = useAuth()
-  const [mode, setMode]       = useState<LoginMode>('customer')
-  const [showPass, setShowPass] = useState(false)
-  const [remember, setRemember] = useState(false)
+  const { loginWithCredentials } = useAuth()
+  const [mode, setMode]         = useState<LoginMode>('customer')
+  const [showPass, setShowPass]  = useState(false)
+  const [remember, setRemember]  = useState(false)
   const [form, setForm] = useState({
     name: '', email: '', phone: '', location: '',
     employeeId: '', password: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  const [error, setError]           = useState<string>('')
 
   useEffect(() => { window.scrollTo(0, 0) }, [])
 
@@ -207,22 +209,35 @@ export default function LoginPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setError('')
     setSubmitting(true)
-    await new Promise(r => setTimeout(r, 900)) // Simulate auth
-    setSubmitting(false)
-    if (mode === 'customer') {
-      login()
-      const destination = location.state?.from || '/book'
-      navigate(destination)
-    } else {
-      login()
-      navigate('/employee-dashboard')
+    try {
+      // Use employeeId field as email for employee mode (UI label says Employee ID
+      // but backend actually matches by email for this demo)
+      const emailToUse = mode === 'customer' ? form.email : (form.employeeId || form.email)
+      const result = await authService.login({
+        email: emailToUse,
+        password: form.password,
+        accountType: mode === 'customer' ? 'user' : 'employee',
+      })
+      loginWithCredentials(result.token, result.user)
+      if (mode === 'customer') {
+        const destination = (location.state as any)?.from || '/book'
+        navigate(destination)
+      } else {
+        navigate('/employee-dashboard')
+      }
+    } catch (err: any) {
+      setError(err.message || 'Login failed. Please try again.')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   const handleModeChange = (m: LoginMode) => {
     setMode(m)
     setShowPass(false)
+    setError('')
     setForm({ name: '', email: '', phone: '', location: '', employeeId: '', password: '' })
   }
 
@@ -364,6 +379,19 @@ export default function LoginPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+
+            {/* Error alert */}
+            {error && (
+              <motion.div
+                className="lp-error-alert"
+                initial={{ opacity: 0, y: -6 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25 }}
+              >
+                <AlertCircle size={14} />
+                {error}
+              </motion.div>
+            )}
 
             {/* Options row */}
             <div className="lp-options">

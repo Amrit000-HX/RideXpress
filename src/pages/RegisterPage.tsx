@@ -1,15 +1,16 @@
 /**
  * RegisterPage — 3-step customer registration wizard.
- * Step 1: Account info (name, age, city, email)
+ * Step 1: Account info (name, age, city, email, password)
  * Step 2: Profile setup (display name, gender, insurance)
- * Step 3: OTP verification (dummy — functional after backend)
+ * Step 3: OTP verification
  */
 import { useState, useRef, useEffect } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { User, Mail, MapPin, Hash, BadgeCheck, Phone, ShieldCheck } from 'lucide-react'
+import { User, Mail, MapPin, Hash, BadgeCheck, Phone, ShieldCheck, Lock, AlertCircle } from 'lucide-react'
 import { AnimatedStepper, Step } from '../components/AnimatedStepper'
 import { useAuth } from '../contexts/AuthContext'
+import * as authService from '../services/authService'
 import './RegisterPage.css'
 
 /* ── OTP box group ──────────────────────────────────── */
@@ -98,14 +99,14 @@ function TextInput({ id, name, type = 'text', placeholder, value, onChange, auto
 export default function RegisterPage() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { login } = useAuth()
+  const { loginWithCredentials } = useAuth()
   const [currentStep, setCurrentStep] = useState(1)
   const [role, setRole] = useState<'customer' | 'employee'>(() => {
     return (location.state as any)?.role || 'customer'
   })
 
-  // Step 1
-  const [s1, setS1] = useState({ name: '', age: '', city: '', email: '' })
+  // Step 1 — added password field
+  const [s1, setS1] = useState({ name: '', age: '', city: '', email: '', password: '' })
   // Step 2
   const [s2, setS2] = useState({ displayName: '', gender: '', hasInsurance: false, insuranceId: '' })
   // Step 3 OTP
@@ -113,6 +114,10 @@ export default function RegisterPage() {
   const [otpSent, setOtpSent] = useState(false)
   const [resendTimer, setResendTimer] = useState(0)
   const [otpVerified, setOtpVerified] = useState(false)
+
+  // API state
+  const [regLoading, setRegLoading] = useState(false)
+  const [regError, setRegError]     = useState('')
 
   useEffect(() => { window.scrollTo(0, 0) }, [])
 
@@ -136,14 +141,32 @@ export default function RegisterPage() {
     }
   }
 
-  const handleComplete = () => {
-    if (role === 'employee') {
-      localStorage.setItem('emp_name', s1.name || 'Employee')
-      navigate('/employee-form')
-    } else {
-      login()
-      const destination = location.state?.from || '/book'
-      navigate(destination)
+  const handleComplete = async () => {
+    setRegError('')
+    setRegLoading(true)
+    try {
+      if (role === 'employee') {
+        // Save name + password to localStorage so EmployeeForm can use them
+        localStorage.setItem('emp_name',     s1.name     || 'Employee')
+        localStorage.setItem('emp_email',    s1.email    || '')
+        localStorage.setItem('emp_password', s1.password || '')
+        navigate('/employee-form')
+      } else {
+        const result = await authService.registerUser({
+          name:     s1.name,
+          email:    s1.email,
+          password: s1.password,
+          phone:    '',
+          city:     s1.city,
+        })
+        loginWithCredentials(result.token, result.user)
+        const destination = (location.state as any)?.from || '/book'
+        navigate(destination)
+      }
+    } catch (err: any) {
+      setRegError(err.message || 'Registration failed. Please try again.')
+    } finally {
+      setRegLoading(false)
     }
   }
 
@@ -214,6 +237,18 @@ export default function RegisterPage() {
             {/* ── STEP 1: Account Info ─────────────────── */}
             <Step title="Account Information">
               <div className="rg-fields">
+                {/* Error banner */}
+                {regError && (
+                  <motion.div
+                    className="rg-error-alert"
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <AlertCircle size={14} />
+                    {regError}
+                  </motion.div>
+                )}
+
                 {/* Role Toggle Selector */}
                 <div className="rg-role-selector">
                   <button
@@ -249,6 +284,10 @@ export default function RegisterPage() {
                 <Field id="email" label="Email Address" icon={<Mail size={15} />} required>
                   <TextInput id="email" name="email" type="email" placeholder="you@example.com"
                     value={s1.email} onChange={ch1} autoComplete="email" />
+                </Field>
+                <Field id="password" label="Password" icon={<Lock size={15} />} required>
+                  <TextInput id="password" name="password" type="password" placeholder="Min 6 characters"
+                    value={s1.password} onChange={ch1} autoComplete="new-password" />
                 </Field>
               </div>
             </Step>
