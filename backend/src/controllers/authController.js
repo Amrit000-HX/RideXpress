@@ -180,11 +180,27 @@ exports.login = async (req, res) => {
 
     // ── Find account in the correct collection ────────────────
     let account = null
+    const identifier = email.trim()
     if (accountType === 'user') {
       // Must explicitly select passwordHash since it's select: false in schema
-      account = await User.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash')
+      account = await User.findOne({ email: identifier.toLowerCase() }).select('+passwordHash')
     } else {
-      account = await Employee.findOne({ email: email.toLowerCase().trim() }).select('+passwordHash')
+      // Employee login accepts either email OR employeeId (e.g. EMP-000001)
+      account = await Employee.findOne({
+        $or: [
+          { email: identifier.toLowerCase() },
+          { employeeId: identifier.toUpperCase() },
+          { employeeId: identifier },
+        ],
+      }).select('+passwordHash')
+
+      // If not found in employees, allow admin account to access employee dashboard too
+      if (!account) {
+        const adminAccount = await User.findOne({ email: identifier.toLowerCase(), role: 'admin' }).select('+passwordHash')
+        if (adminAccount) {
+          account = adminAccount
+        }
+      }
     }
 
     // ── Account not found ─────────────────────────────────────

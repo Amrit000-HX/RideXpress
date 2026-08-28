@@ -3,12 +3,14 @@
  */
 require('dotenv').config()
 const connectDB = require('./src/config/db')
+const autoSeed  = require('./src/utils/autoSeed')
 const app       = require('./app')
 
 const PORT = process.env.PORT || 5000
 
 ;(async () => {
   await connectDB()
+  await autoSeed()
   const server = app.listen(PORT, () => {
     console.log(`🚀  RideXpress API running on http://localhost:${PORT}`)
   })
