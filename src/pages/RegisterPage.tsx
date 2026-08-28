@@ -237,7 +237,18 @@ export default function RegisterPage() {
             {/* ── STEP 1: Account Info ─────────────────── */}
             <Step title="Account Information">
               <div className="rg-fields">
-                {/* Error banner */}
+                {/* Loading / Error banner */}
+                {regLoading && (
+                  <motion.div
+                    className="rg-error-alert"
+                    style={{ background: '#ecfdf5', borderColor: '#a7f3d0', color: '#065f46' }}
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                  >
+                    <BadgeCheck size={14} />
+                    Creating account, please wait...
+                  </motion.div>
+                )}
                 {regError && (
                   <motion.div
                     className="rg-error-alert"
