@@ -489,12 +489,12 @@ function CompletedRidesSection() {
    ════════════════════════════════════════════ */
 export default function EmployeeDashboard() {
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { user, logout } = useAuth()
   const heroRef = useRef<HTMLDivElement>(null)
 
-  const empName    = localStorage.getItem('emp_name')    || 'Arjun Mehta'
-  const empVehicle = localStorage.getItem('emp_vehicle') || 'XL SUV'
-  const initials   = empName.split(' ').map((n: string) => n[0]).join('').toUpperCase()
+  const empName    = user?.name || localStorage.getItem('emp_name') || 'Employee'
+  const empVehicle = user?.vehicleCategory || localStorage.getItem('emp_vehicle') || 'Express Fleet'
+  const initials   = empName.split(' ').filter(Boolean).map((n: string) => n[0]).join('').toUpperCase() || 'E'
 
   const { scrollYProgress } = useScroll({
     target: heroRef,
