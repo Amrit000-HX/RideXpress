@@ -386,8 +386,11 @@
   width: 100%;
   background: #F5F0E8;
   border-radius: 28px 28px 0 0;
-  overflow: hidden;
+  overflow-y: auto;
+  max-height: 92vh;
   box-shadow: 0 -16px 60px rgba(0,0,0,0.3);
+  display: flex;
+  flex-direction: column;
 }
 
 .bk-drawer-handle {
@@ -395,6 +398,7 @@
   background: rgba(26,26,26,0.15);
   border-radius: 2px;
   margin: 14px auto;
+  flex-shrink: 0;
 }
 
 .bk-drawer-head {
@@ -403,6 +407,7 @@
   align-items: center;
   padding: 8px 32px 20px;
   border-bottom: 1px solid rgba(26,26,26,0.08);
+  flex-shrink: 0;
 }
 .bk-drawer-vehicle {
   font-family: 'Archivo Black', sans-serif;
@@ -431,11 +436,13 @@
   color: #1A1A1A;
   cursor: crosshair;
   transition: background 0.2s ease;
+  flex-shrink: 0;
 }
 .bk-close-btn:hover { background: rgba(26,26,26,0.14); }
 
 .bk-drawer-body {
-  padding: 24px 32px;
+  padding: 20px 32px;
+  flex: 1;
 }
 
 .bk-loc-track {

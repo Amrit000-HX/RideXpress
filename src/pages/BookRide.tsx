@@ -9,9 +9,10 @@ import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-mo
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  Clock, Users, ArrowRight, X, MapPin,
-  Navigation, Shield, CheckCircle2, ChevronDown,
+  Clock, Users, ArrowRight, X, Navigation,
+  Shield, CheckCircle2, ChevronDown,
 } from 'lucide-react'
+import MapPicker, { type LocationData } from '../components/MapPicker/MapPicker'
 import './BookRide.css'
 
 import imgScooty from '../assets/veh_scooty.png'
@@ -315,8 +316,10 @@ function LocationDrawer({
 }: {
   vehicle: Vehicle; onClose: () => void; onConfirm: () => void
 }) {
-  const [pickup, setPickup] = useState('')
-  const [drop, setDrop]     = useState('')
+  const [pickup, setPickup]         = useState<LocationData | null>(null)
+  const [drop, setDrop]             = useState<LocationData | null>(null)
+  const [distanceKm, setDistanceKm] = useState<number | null>(null)
+  const [fare, setFare]             = useState<number | null>(null)
 
   return (
     <motion.div
@@ -343,37 +346,32 @@ function LocationDrawer({
           <button className="bk-close-btn" onClick={onClose}><X size={18} /></button>
         </div>
 
-        {/* Location inputs */}
+        {/* Map & Location Selection */}
         <div className="bk-drawer-body">
-          <div className="bk-loc-track">
-            <div className="bk-loc-row">
-              <div className="bk-loc-dot bk-dot-green" />
-              <input
-                className="bk-loc-input" placeholder="Pickup location..."
-                value={pickup} onChange={e => setPickup(e.target.value)}
-              />
-              <MapPin size={14} className="bk-loc-icon" />
-            </div>
-            <div className="bk-loc-line" />
-            <div className="bk-loc-row">
-              <div className="bk-loc-dot bk-dot-red" />
-              <input
-                className="bk-loc-input" placeholder="Drop location..."
-                value={drop} onChange={e => setDrop(e.target.value)}
-              />
-              <MapPin size={14} className="bk-loc-icon" />
-            </div>
-          </div>
+          <MapPicker
+            vehiclePrice={vehicle.price}
+            onPickupChange={setPickup}
+            onDropChange={setDrop}
+            onDistanceChange={(km, f) => {
+              setDistanceKm(km)
+              setFare(f)
+            }}
+          />
         </div>
 
         {/* Footer */}
         <div className="bk-drawer-foot">
           <div className="bk-fare-est">
             <div>
-              <div className="bk-fare-label">Estimated fare (5 km)</div>
+              <div className="bk-fare-label">
+                {distanceKm !== null ? `Estimated Fare (${distanceKm} km)` : 'Estimated fare (5 km)'}
+              </div>
               <div className="bk-fare-range">
-                ₹{(vehicle.price * 3).toLocaleString('en-IN')} –
-                ₹{(vehicle.price * 7).toLocaleString('en-IN')}
+                {fare !== null ? (
+                  `₹${fare.toLocaleString('en-IN')}`
+                ) : (
+                  `₹${(vehicle.price * 3).toLocaleString('en-IN')} – ₹${(vehicle.price * 7).toLocaleString('en-IN')}`
+                )}
               </div>
             </div>
             <div className="bk-fare-note">
