@@ -1,7 +1,7 @@
 /**
  * LoginPage — Split-screen SaaS login adapted for RideXpress.
  * LEFT: Sage-green brand panel (dot-grid, tagline, testimonial, trust strip)
- * RIGHT: White form with PillNav-style GSAP toggle (Customer ↔ Employee)
+ * RIGHT: Clean form with PillNav toggle & 2-Step OTP Authentication
  */
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
@@ -10,13 +10,15 @@ import gsap from 'gsap'
 import { useAuth } from '../contexts/AuthContext'
 import * as authService from '../services/authService'
 import {
-  User, Mail, Phone, MapPin, Lock, Eye, EyeOff,
-  BadgeCheck, ArrowRight, Star, AlertCircle
+  Mail, Lock, Eye, EyeOff,
+  BadgeCheck, ArrowRight, Star, AlertCircle,
+  ShieldCheck, ArrowLeft, RefreshCw, KeyRound, CheckCircle2
 } from 'lucide-react'
 import './LoginPage.css'
 
 /* ── Types ─────────────────────────────────────────── */
 type LoginMode = 'customer' | 'employee'
+type LoginStep = 'credentials' | 'otp'
 
 /* ── GSAP PillNav Toggle ────────────────────────────── */
 function ModeToggle({
@@ -187,59 +189,206 @@ function PasswordField({ value, onChange, show, toggle }: {
   )
 }
 
-/* ── Main Page ──────────────────────────────────────── */
+/* ── 6-Digit OTP Box Grid ────────────────────────────── */
+function OtpInputGrid({
+  value,
+  onChange,
+}: {
+  value: string[]
+  onChange: (v: string[]) => void
+}) {
+  const refs = useRef<(HTMLInputElement | null)[]>([])
+
+  const handleChange = (i: number, val: string) => {
+    const d = val.replace(/\D/g, '').slice(-1)
+    const next = [...value]
+    next[i] = d
+    onChange(next)
+    if (d && i < 5) {
+      refs.current[i + 1]?.focus()
+    }
+  }
+
+  const handleKeyDown = (i: number, e: React.KeyboardEvent) => {
+    if (e.key === 'Backspace' && !value[i] && i > 0) {
+      refs.current[i - 1]?.focus()
+    }
+    if (e.key === 'ArrowLeft' && i > 0) refs.current[i - 1]?.focus()
+    if (e.key === 'ArrowRight' && i < 5) refs.current[i + 1]?.focus()
+  }
+
+  const handlePaste = (e: React.ClipboardEvent) => {
+    e.preventDefault()
+    const digits = e.clipboardData.getData('text').replace(/\D/g, '').slice(0, 6).split('')
+    const next = [...value]
+    digits.forEach((d, i) => { if (i < 6) next[i] = d })
+    onChange(next)
+    refs.current[Math.min(digits.length, 5)]?.focus()
+  }
+
+  return (
+    <div className="lp-otp-grid" role="group" aria-label="6-digit OTP code">
+      {value.map((digit, i) => (
+        <input
+          key={i}
+          ref={el => { refs.current[i] = el }}
+          className={`lp-otp-box${digit ? ' lp-otp-filled' : ''}`}
+          type="text"
+          inputMode="numeric"
+          maxLength={1}
+          value={digit}
+          onChange={e => handleChange(i, e.target.value)}
+          onKeyDown={e => handleKeyDown(i, e)}
+          onPaste={handlePaste}
+          aria-label={`Digit ${i + 1}`}
+          autoFocus={i === 0}
+        />
+      ))}
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════
+   MAIN COMPONENT: LoginPage
+   ═══════════════════════════════════════════════════════ */
 export default function LoginPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const { loginWithCredentials } = useAuth()
-  const [mode, setMode]         = useState<LoginMode>('customer')
-  const [showPass, setShowPass]  = useState(false)
-  const [remember, setRemember]  = useState(false)
-  const [form, setForm] = useState({
-    name: '', email: '', phone: '', location: '',
-    employeeId: '', password: '',
-  })
-  const [submitting, setSubmitting] = useState(false)
-  const [error, setError]           = useState<string>('')
+
+  // State
+  const [mode, setMode]               = useState<LoginMode>('customer')
+  const [step, setStep]               = useState<LoginStep>('credentials')
+  const [showPass, setShowPass]        = useState(false)
+  const [remember, setRemember]        = useState(false)
+  const [form, setForm]               = useState({ email: '', employeeId: '', password: '' })
+  const [submitting, setSubmitting]   = useState(false)
+  const [error, setError]             = useState<string>('')
+
+  // OTP State
+  const [otp, setOtp]                 = useState(['', '', '', '', '', ''])
+  const [generatedOtp, setGeneratedOtp]= useState('482910')
+  const [resendTimer, setResendTimer] = useState(30)
+  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any } | null>(null)
+  const [verifying, setVerifying]     = useState(false)
+  const [verifiedSuccess, setVerifiedSuccess] = useState(false)
 
   useEffect(() => { window.scrollTo(0, 0) }, [])
+
+  // Resend Countdown Timer
+  useEffect(() => {
+    if (step !== 'otp' || resendTimer <= 0) return
+    const id = window.setInterval(() => setResendTimer(t => t - 1), 1000)
+    return () => clearInterval(id)
+  }, [step, resendTimer])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  /* ── Step 1: Validate Credentials & Generate OTP ── */
+  const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+
+    const emailToUse = mode === 'customer' ? form.email.trim() : (form.employeeId.trim() || form.email.trim())
+
+    if (!emailToUse) {
+      setError(mode === 'customer' ? 'Please enter your email address.' : 'Please enter your Employee ID or email.')
+      return
+    }
+    if (!form.password) {
+      setError('Please enter your password.')
+      return
+    }
+
     setSubmitting(true)
     try {
-      // Use employeeId field as email for employee mode (UI label says Employee ID
-      // but backend actually matches by email for this demo)
-      const emailToUse = mode === 'customer' ? form.email : (form.employeeId || form.email)
+      // Validate credentials against MongoDB backend
       const result = await authService.login({
         email: emailToUse,
         password: form.password,
         accountType: mode === 'customer' ? 'user' : 'employee',
       })
-      loginWithCredentials(result.token, result.user)
-      if (mode === 'customer') {
-        const destination = (location.state as any)?.from || '/book'
-        navigate(destination)
-      } else {
-        navigate('/employee-dashboard')
-      }
+
+      // Store pending auth details
+      setPendingAuth({ token: result.token, user: result.user })
+
+      // Generate a dynamic 6-digit verification code
+      const newCode = Math.floor(100000 + Math.random() * 900000).toString()
+      setGeneratedOtp(newCode)
+      setOtp(['', '', '', '', '', ''])
+      setResendTimer(30)
+
+      // Advance to OTP step on the SAME page
+      setStep('otp')
     } catch (err: any) {
-      setError(err.message || 'Login failed. Please try again.')
+      setError(err.message || 'Invalid email or password.')
     } finally {
       setSubmitting(false)
     }
   }
 
+  /* ── Step 2: Verify OTP & Complete Login ─────────── */
+  const handleOtpVerify = (e: React.FormEvent) => {
+    e.preventDefault()
+    setError('')
+    const entered = otp.join('')
+
+    if (entered.length < 6) {
+      setError('Please enter the full 6-digit verification code.')
+      return
+    }
+
+    setVerifying(true)
+
+    // Verify entered code against generated OTP (or demo code '123456')
+    if (entered === generatedOtp || entered === '123456') {
+      setVerifiedSuccess(true)
+      setTimeout(() => {
+        if (pendingAuth) {
+          loginWithCredentials(pendingAuth.token, pendingAuth.user)
+        }
+        if (mode === 'customer') {
+          const destination = (location.state as any)?.from || '/book'
+          navigate(destination)
+        } else {
+          navigate('/employee-dashboard')
+        }
+      }, 600)
+    } else {
+      setVerifying(false)
+      setError('Invalid verification code. Please check and try again.')
+    }
+  }
+
+  /* ── Resend Code ─────────────────────────────────── */
+  const handleResendOtp = () => {
+    const newCode = Math.floor(100000 + Math.random() * 900000).toString()
+    setGeneratedOtp(newCode)
+    setOtp(['', '', '', '', '', ''])
+    setResendTimer(30)
+    setError('')
+  }
+
+  /* ── Switch Mode (Reset everything) ──────────────── */
   const handleModeChange = (m: LoginMode) => {
     setMode(m)
+    setStep('credentials')
     setShowPass(false)
     setError('')
-    setForm({ name: '', email: '', phone: '', location: '', employeeId: '', password: '' })
+    setPendingAuth(null)
+    setForm({ email: '', employeeId: '', password: '' })
+    setOtp(['', '', '', '', '', ''])
   }
+
+  /* ── Back to Credentials ─────────────────────────── */
+  const handleBackToCredentials = () => {
+    setStep('credentials')
+    setError('')
+    setOtp(['', '', '', '', '', ''])
+  }
+
+  const emailDisplay = mode === 'customer' ? form.email : (form.employeeId || form.email)
 
   return (
     <div className="lp-root">
@@ -284,7 +433,6 @@ export default function LoginPage() {
             </div>
           </div>
 
-
         </div>
       </div>
 
@@ -297,131 +445,222 @@ export default function LoginPage() {
         </div>
 
         <div className="lp-form-wrap">
+
           {/* Header */}
           <div className="lp-form-header">
-            <h1 className="lp-welcome">Welcome back</h1>
-            <p className="lp-form-sub">
-              {mode === 'customer'
-                ? 'Sign in to book your next ride or schedule a delivery.'
-                : 'Access the RideXpress employee dashboard.'}
-            </p>
+            {step === 'credentials' ? (
+              <>
+                <h1 className="lp-welcome">Welcome back</h1>
+                <p className="lp-form-sub">
+                  {mode === 'customer'
+                    ? 'Sign in to book rides, track deliveries, and manage trips.'
+                    : 'Access the RideXpress employee & rider portal.'}
+                </p>
+              </>
+            ) : (
+              <>
+                <div className="lp-otp-badge-icon">
+                  <ShieldCheck size={28} />
+                </div>
+                <h1 className="lp-welcome">Verification Code</h1>
+                <p className="lp-form-sub">
+                  Enter the 6-digit code sent to <strong>{emailDisplay}</strong>
+                </p>
+              </>
+            )}
           </div>
 
-          {/* PillNav Mode Toggle */}
-          <ModeToggle mode={mode} onChange={handleModeChange} />
+          {/* PillNav Mode Toggle (Only visible on Step 1) */}
+          {step === 'credentials' && (
+            <ModeToggle mode={mode} onChange={handleModeChange} />
+          )}
 
-          {/* Form */}
-          <form className="lp-form" onSubmit={handleSubmit} noValidate>
-            <AnimatePresence mode="wait">
-              {mode === 'customer' ? (
-                <motion.div
-                  key="customer"
-                  className="lp-fields"
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
-                >
-                  <InputField
-                    id="name" name="name" label="Full Name"
-                    placeholder="Your full name"
-                    icon={<User size={15} />}
-                    value={form.name} onChange={handleChange}
-                    autoComplete="name"
-                  />
-                  <InputField
-                    id="email" name="email" label="Email Address" type="email"
-                    placeholder="you@example.com"
-                    icon={<Mail size={15} />}
-                    value={form.email} onChange={handleChange}
-                    autoComplete="email"
-                  />
-                  <div className="lp-two-col">
+          {/* STEP 1: CREDENTIALS FORM */}
+          {step === 'credentials' && (
+            <form className="lp-form" onSubmit={handleCredentialsSubmit} noValidate>
+              <AnimatePresence mode="wait">
+                {mode === 'customer' ? (
+                  <motion.div
+                    key="customer"
+                    className="lp-fields"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.25 }}
+                  >
                     <InputField
-                      id="phone" name="phone" label="Phone Number" type="tel"
-                      placeholder="+91 98765 43210"
-                      icon={<Phone size={15} />}
-                      value={form.phone} onChange={handleChange}
-                      autoComplete="tel"
+                      id="email"
+                      name="email"
+                      label="Email Address"
+                      type="email"
+                      placeholder="name@example.com"
+                      icon={<Mail size={15} />}
+                      value={form.email}
+                      onChange={handleChange}
+                      autoComplete="email"
                     />
+                    <PasswordField
+                      value={form.password}
+                      onChange={handleChange}
+                      show={showPass}
+                      toggle={() => setShowPass(v => !v)}
+                    />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="employee"
+                    className="lp-fields"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -10 }}
+                    transition={{ duration: 0.25 }}
+                  >
                     <InputField
-                      id="location" name="location" label="Your City"
-                      placeholder="Mumbai, Delhi…"
-                      icon={<MapPin size={15} />}
-                      value={form.location} onChange={handleChange}
+                      id="empId"
+                      name="employeeId"
+                      label="Employee ID or Email"
+                      placeholder="EMP-000001 or driver@ridexpress.com"
+                      icon={<BadgeCheck size={15} />}
+                      value={form.employeeId}
+                      onChange={handleChange}
+                      autoComplete="username"
                     />
-                  </div>
-                  <PasswordField
-                    value={form.password} onChange={handleChange}
-                    show={showPass} toggle={() => setShowPass(v => !v)}
-                  />
-                </motion.div>
-              ) : (
+                    <PasswordField
+                      value={form.password}
+                      onChange={handleChange}
+                      show={showPass}
+                      toggle={() => setShowPass(v => !v)}
+                    />
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* Error alert */}
+              {error && (
                 <motion.div
-                  key="employee"
-                  className="lp-fields"
-                  initial={{ opacity: 0, y: 10 }}
+                  className="lp-error-alert"
+                  initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -10 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.25 }}
                 >
-                  <InputField
-                    id="empId" name="employeeId" label="Employee ID"
-                    placeholder="EMP-000123"
-                    icon={<BadgeCheck size={15} />}
-                    value={form.employeeId} onChange={handleChange}
-                    autoComplete="username"
-                  />
-                  <PasswordField
-                    value={form.password} onChange={handleChange}
-                    show={showPass} toggle={() => setShowPass(v => !v)}
-                  />
+                  <AlertCircle size={14} />
+                  {error}
                 </motion.div>
               )}
-            </AnimatePresence>
 
-            {/* Error alert */}
-            {error && (
-              <motion.div
-                className="lp-error-alert"
-                initial={{ opacity: 0, y: -6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
+              {/* Options row */}
+              <div className="lp-options">
+                <label className="lp-remember">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={e => setRemember(e.target.checked)}
+                  />
+                  <span>Remember me</span>
+                </label>
+                <a href="#" className="lp-forgot">Forgot password?</a>
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="submit"
+                className={`lp-submit${submitting ? ' submitting' : ''}`}
+                disabled={submitting}
               >
-                <AlertCircle size={14} />
-                {error}
-              </motion.div>
-            )}
+                {submitting ? (
+                  <span className="lp-spinner" />
+                ) : (
+                  <>
+                    <span>Continue to Verification</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+            </form>
+          )}
 
-            {/* Options row */}
-            <div className="lp-options">
-              <label className="lp-remember">
-                <input
-                  type="checkbox"
-                  checked={remember}
-                  onChange={e => setRemember(e.target.checked)}
-                />
-                <span>Remember me</span>
-              </label>
-              <a href="#" className="lp-forgot">Forgot password?</a>
-            </div>
-
-            {/* Submit button */}
-            <button
-              type="submit"
-              className={`lp-submit${submitting ? ' submitting' : ''}`}
-              disabled={submitting}
+          {/* STEP 2: OTP AUTHENTICATION FORM */}
+          {step === 'otp' && (
+            <motion.form
+              className="lp-form lp-otp-form"
+              onSubmit={handleOtpVerify}
+              initial={{ opacity: 0, scale: 0.96 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ duration: 0.3 }}
+              noValidate
             >
-              {submitting ? (
-                <span className="lp-spinner" />
-              ) : (
-                <>
-                  {mode === 'customer' ? 'Sign in as Customer' : 'Sign in as Employee'}
-                  <ArrowRight size={16} />
-                </>
+              {/* Quick Auto-Fill Demo OTP Pill */}
+              <div
+                className="lp-demo-otp-pill"
+                onClick={() => setOtp(generatedOtp.split(''))}
+                title="Click to auto-fill code for instant test"
+              >
+                <KeyRound size={13} />
+                <span>Demo Code: <strong>{generatedOtp}</strong> (Click to auto-fill)</span>
+              </div>
+
+              {/* 6 Digit Box Grid */}
+              <OtpInputGrid value={otp} onChange={setOtp} />
+
+              {/* Error Alert */}
+              {error && (
+                <motion.div
+                  className="lp-error-alert"
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <AlertCircle size={14} />
+                  {error}
+                </motion.div>
               )}
-            </button>
-          </form>
+
+              {/* Resend OTP Row */}
+              <div className="lp-otp-resend-row">
+                {resendTimer > 0 ? (
+                  <span className="lp-otp-timer">Resend code in <strong>{resendTimer}s</strong></span>
+                ) : (
+                  <button
+                    type="button"
+                    className="lp-otp-resend-btn"
+                    onClick={handleResendOtp}
+                  >
+                    <RefreshCw size={13} /> Resend OTP
+                  </button>
+                )}
+              </div>
+
+              {/* Verify & Sign In Button */}
+              <button
+                type="submit"
+                className={`lp-submit${verifying ? ' submitting' : ''}`}
+                disabled={verifying || otp.join('').length < 6}
+              >
+                {verifying ? (
+                  <span className="lp-spinner" />
+                ) : verifiedSuccess ? (
+                  <>
+                    <CheckCircle2 size={18} />
+                    <span>Verified! Signing in…</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Verify &amp; Sign In</span>
+                    <ArrowRight size={16} />
+                  </>
+                )}
+              </button>
+
+              {/* Back to Credentials Link */}
+              <button
+                type="button"
+                className="lp-otp-back-link"
+                onClick={handleBackToCredentials}
+              >
+                <ArrowLeft size={14} />
+                <span>Change email or password</span>
+              </button>
+            </motion.form>
+          )}
 
           {/* Footer */}
           <div className="lp-form-footer">

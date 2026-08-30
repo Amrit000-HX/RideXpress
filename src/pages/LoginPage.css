@@ -480,5 +480,134 @@
   font-weight: 500;
   padding: 10px 14px;
   border-radius: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 16px;
+}
+
+/* ── OTP 2-Step Verification Styles ──────────────────── */
+.lp-otp-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.lp-otp-badge-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(107, 158, 114, 0.12);
+  border: 2px solid rgba(107, 158, 114, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent);
+  margin-bottom: 12px;
+}
+
+/* Demo OTP Auto-fill Pill */
+.lp-demo-otp-pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 16px;
+  background: rgba(107, 158, 114, 0.08);
+  border: 1.5px dashed rgba(107, 158, 114, 0.4);
+  border-radius: 30px;
+  color: #1A1A1A;
+  font-size: 12.5px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+.lp-demo-otp-pill:hover {
+  background: rgba(107, 158, 114, 0.16);
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.lp-demo-otp-pill strong {
+  color: var(--accent);
+  letter-spacing: 1.5px;
+}
+
+/* 6-Box OTP Input Grid */
+.lp-otp-grid {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin: 10px 0;
+}
+
+.lp-otp-box {
+  width: 48px;
+  height: 58px;
+  border: 2px solid #E2E5EA;
+  border-radius: 12px;
+  background: #fff;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: #1A1A1A;
+  text-align: center;
+  outline: none;
+  transition: all 0.2s ease;
+  caret-color: var(--accent);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.lp-otp-box:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(107, 158, 114, 0.2);
+  transform: translateY(-1px);
+}
+.lp-otp-box.lp-otp-filled {
+  border-color: var(--accent);
+  background: rgba(107, 158, 114, 0.05);
+}
+
+/* Resend Row */
+.lp-otp-resend-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 4px 0 10px;
+  font-size: 13px;
+  color: #6B6B6B;
+}
+.lp-otp-timer strong {
+  color: var(--accent);
+}
+.lp-otp-resend-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 4px 10px;
+  border-radius: 6px;
+  transition: background 0.15s ease;
+}
+.lp-otp-resend-btn:hover {
+  background: rgba(107, 158, 114, 0.1);
+}
+
+/* Back Link */
+.lp-otp-back-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: #6B6B6B;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: -8px;
+  transition: color 0.15s ease;
+}
+.lp-otp-back-link:hover {
+  color: #1A1A1A;
 }
