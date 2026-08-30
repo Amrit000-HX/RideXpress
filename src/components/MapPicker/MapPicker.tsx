@@ -1,6 +1,6 @@
 /**
  * MapPicker.tsx
- * Interactive map for picking pickup + drop locations.
+ * Full-Window Interactive Map for Ride Location Selection.
  * Stack: Leaflet.js · OpenStreetMap tiles · Browser Geolocation API
  *        Nominatim (reverse geocode + search) · OSRM (route distance)
  * 100% FREE — no API keys required.
@@ -9,7 +9,10 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, useMap, useMapEvents } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { Locate, Search, X, Navigation2, Loader } from 'lucide-react'
+import {
+  Locate, Search, X, Navigation2, Loader,
+  ArrowLeft, Navigation, Shield,
+} from 'lucide-react'
 import './MapPicker.css'
 
 /* ─── Fix default Leaflet marker icon (broken by Vite bundler) ── */
@@ -26,30 +29,38 @@ L.Icon.Default.mergeOptions({
 })
 
 /* ─── Custom SVG pins ─────────────────────────────────────────── */
-const pin = (color: string) =>
+const pin = (color: string, label: string) =>
   L.divIcon({
     className: '',
-    html: `<svg xmlns="http://www.w3.org/2000/svg" width="30" height="44" viewBox="0 0 30 44">
-      <path fill="${color}" stroke="white" stroke-width="2.5"
-        d="M15 1C7.3 1 1 7.3 1 15c0 11 14 27 14 27S29 26 29 15C29 7.3 22.7 1 15 1z"/>
-      <circle fill="white" cx="15" cy="15" r="5.5"/>
-    </svg>`,
-    iconSize:   [30, 44],
-    iconAnchor: [15, 44],
-    popupAnchor:[0, -44],
+    html: `<div style="display:flex;flex-direction:column;align-items:center;transform:translate(-50%,-100%);">
+      <div style="background:${color};color:#fff;font-size:10px;font-weight:700;padding:2px 6px;border-radius:4px;white-space:nowrap;margin-bottom:2px;box-shadow:0 2px 6px rgba(0,0,0,0.3);letter-spacing:0.5px;">${label}</div>
+      <svg xmlns="http://www.w3.org/2000/svg" width="30" height="42" viewBox="0 0 30 42">
+        <path fill="${color}" stroke="#ffffff" stroke-width="2"
+          d="M15 1C7.3 1 1 7.3 1 15c0 10 14 26 14 26S29 25 29 15C29 7.3 22.7 1 15 1z"/>
+        <circle fill="#ffffff" cx="15" cy="15" r="5"/>
+      </svg>
+    </div>`,
+    iconSize:   [30, 42],
+    iconAnchor: [15, 42],
+    popupAnchor:[0, -42],
   })
 
-const pickupPin = pin('#6B9E72')  // sage green
-const dropPin   = pin('#e74c3c')  // red
+const pickupPin = pin('#6B9E72', 'PICKUP')  // sage green
+const dropPin   = pin('#e74c3c', 'DROP')    // red
 
 /* ─── Types ───────────────────────────────────────────────────── */
-export interface LatLng    { lat: number; lng: number }
+export interface LatLng       { lat: number; lng: number }
 export interface LocationData { latLng: LatLng; address: string }
 
 interface SearchResult { display_name: string; lat: string; lon: string }
 
 interface MapPickerProps {
+  vehicleType:      string
   vehiclePrice:     number
+  vehiclePriceUnit: string
+  vehicleEta:       string
+  onClose:          () => void
+  onConfirm:        () => void
   onPickupChange:   (loc: LocationData) => void
   onDropChange:     (loc: LocationData) => void
   onDistanceChange: (km: number, fare: number) => void
@@ -115,8 +126,25 @@ async function getRouteDistance(from: LatLng, to: LatLng): Promise<number> {
 function FlyTo({ target, zoom }: { target: LatLng | null; zoom: number }) {
   const map = useMap()
   useEffect(() => {
-    if (target) map.flyTo([target.lat, target.lng], zoom, { duration: 1 })
+    if (target) {
+      map.flyTo([target.lat, target.lng], zoom, { duration: 1.2 })
+    }
   }, [target, zoom, map])
+  return null
+}
+
+/* ─── Inner helper: auto-fit bounds when both pins exist ─────── */
+function FitBounds({ pickup, drop }: { pickup: LatLng | null; drop: LatLng | null }) {
+  const map = useMap()
+  useEffect(() => {
+    if (pickup && drop) {
+      const bounds = L.latLngBounds([
+        [pickup.lat, pickup.lng],
+        [drop.lat, drop.lng],
+      ])
+      map.fitBounds(bounds, { padding: [100, 100], maxZoom: 16 })
+    }
+  }, [pickup, drop, map])
   return null
 }
 
@@ -129,10 +157,15 @@ function MapClickHandler({ onMapClick }: { onMapClick: (ll: LatLng) => void }) {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   MAIN COMPONENT
+   MAIN FULL-WINDOW MAP COMPONENT
    ═══════════════════════════════════════════════════════════════ */
 export default function MapPicker({
+  vehicleType,
   vehiclePrice,
+  vehiclePriceUnit,
+  vehicleEta,
+  onClose,
+  onConfirm,
   onPickupChange,
   onDropChange,
   onDistanceChange,
@@ -200,7 +233,7 @@ export default function MapPicker({
       },
       err => {
         setGpsLoading(false)
-        if (err.code === 1) setGpsError('Location permission denied. Please enable it in your browser settings.')
+        if (err.code === 1) setGpsError('Location permission denied. Please allow location access in your browser.')
         else setGpsError('Could not get your location. Try again or tap the map.')
       },
       { timeout: 10000, maximumAge: 60000 }
@@ -227,15 +260,22 @@ export default function MapPicker({
     [resolveAddr]
   )
 
-  /* ── Map click places drop pin ── */
+  /* ── Map click places drop pin (or pickup if not set yet) ── */
   const handleMapClick = useCallback(
     (ll: LatLng) => {
-      setDrop(ll)
-      setFlyTarget(ll)
-      setFlyZoom(PLACED_ZOOM)
-      resolveAddr(ll, 'drop')
+      if (!pickup) {
+        setPickup(ll)
+        setFlyTarget(ll)
+        setFlyZoom(PLACED_ZOOM)
+        resolveAddr(ll, 'pickup')
+      } else {
+        setDrop(ll)
+        setFlyTarget(ll)
+        setFlyZoom(PLACED_ZOOM)
+        resolveAddr(ll, 'drop')
+      }
     },
-    [resolveAddr]
+    [pickup, resolveAddr]
   )
 
   /* ── Search with debounce ── */
@@ -258,7 +298,7 @@ export default function MapPicker({
     setDrop(ll)
     setFlyTarget(ll)
     setFlyZoom(PLACED_ZOOM)
-    setSearchQuery(r.display_name.split(',').slice(0, 2).join(','))
+    setSearchQuery(r.display_name.split(',').slice(0, 3).join(','))
     setShowSuggest(false)
     setSuggestions([])
     resolveAddr(ll, 'drop')
@@ -279,76 +319,15 @@ export default function MapPicker({
     pickup && drop ? [[pickup.lat, pickup.lng], [drop.lat, drop.lng]] : []
 
   return (
-    <div className="mp-wrap">
+    <div className="mp-fullscreen">
 
-      {/* ── Controls bar ── */}
-      <div className="mp-controls">
-
-        {/* GPS button */}
-        <button
-          className={`mp-gps-btn ${gpsLoading ? 'mp-gps-loading' : ''}`}
-          onClick={handleGps}
-          disabled={gpsLoading}
-          title="Use my current location as pickup"
-        >
-          {gpsLoading ? <Loader size={14} className="mp-spin" /> : <Locate size={14} />}
-          {gpsLoading ? 'Locating…' : 'Use My Location'}
-        </button>
-
-        {/* Drop location search */}
-        <div className="mp-search-wrap" ref={searchRef}>
-          <div className="mp-search-row">
-            <Search size={14} className="mp-search-icon" />
-            <input
-              className="mp-search-input"
-              placeholder="Search drop location…"
-              value={searchQuery}
-              onChange={e => handleSearchInput(e.target.value)}
-              onFocus={() => suggestions.length > 0 && setShowSuggest(true)}
-            />
-            {searchQuery && (
-              <button
-                className="mp-search-clear"
-                onClick={() => { setSearchQuery(''); setSuggestions([]); setShowSuggest(false) }}
-              >
-                <X size={12} />
-              </button>
-            )}
-            {searchLoad && <Loader size={12} className="mp-spin mp-search-spin" />}
-          </div>
-
-          {/* Suggestions dropdown */}
-          {showSuggest && suggestions.length > 0 && (
-            <ul className="mp-suggest-list">
-              {suggestions.map((s, i) => (
-                <li
-                  key={i}
-                  className="mp-suggest-item"
-                  onMouseDown={() => handleSuggestionClick(s)}
-                >
-                  <Navigation2 size={11} className="mp-suggest-icon" />
-                  <span>{s.display_name}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-
-      {/* ── GPS error ── */}
-      {gpsError && (
-        <div className="mp-gps-error">
-          ⚠ {gpsError}
-        </div>
-      )}
-
-      {/* ── Map ── */}
-      <div className="mp-map-container">
+      {/* ── 1. FULL-WINDOW MAP CANVAS ── */}
+      <div className="mp-map-canvas">
         <MapContainer
           center={[INDIA_CENTER.lat, INDIA_CENTER.lng]}
           zoom={DEFAULT_ZOOM}
           style={{ height: '100%', width: '100%' }}
-          zoomControl={true}
+          zoomControl={false}
         >
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -356,6 +335,7 @@ export default function MapPicker({
           />
 
           <FlyTo target={flyTarget} zoom={flyZoom} />
+          <FitBounds pickup={pickup} drop={drop} />
           <MapClickHandler onMapClick={handleMapClick} />
 
           {/* Pickup pin — draggable green */}
@@ -382,61 +362,171 @@ export default function MapPicker({
           {polyLine.length === 2 && (
             <Polyline
               positions={polyLine}
-              pathOptions={{ color: '#6B9E72', weight: 2.5, dashArray: '6 6', opacity: 0.8 }}
+              pathOptions={{ color: '#1A1A1A', weight: 4, dashArray: '8 8', opacity: 0.85 }}
             />
           )}
         </MapContainer>
-
-        {/* Map legend overlay */}
-        <div className="mp-legend">
-          <span className="mp-legend-item"><span className="mp-dot mp-dot-green" /> Pickup</span>
-          <span className="mp-legend-item"><span className="mp-dot mp-dot-red" /> Drop</span>
-        </div>
-
-        {/* Instruction overlay (shown until both pins placed) */}
-        {!pickup && !drop && (
-          <div className="mp-hint-overlay">
-            <p>📍 Click "Use My Location" for pickup<br />then tap map to place your drop</p>
-          </div>
-        )}
-        {pickup && !drop && (
-          <div className="mp-hint-overlay mp-hint-small">
-            <p>🔴 Now tap map or search to set drop location</p>
-          </div>
-        )}
       </div>
 
-      {/* ── Address cards ── */}
-      <div className="mp-addr-cards">
-        <div className="mp-addr-card mp-addr-pickup">
-          <span className="mp-addr-dot mp-dot-green" />
-          <div className="mp-addr-text">
-            <span className="mp-addr-label">Pickup</span>
-            <span className="mp-addr-value">
-              {pickupAddr || (gpsLoading ? 'Detecting…' : 'Not set — use GPS or drag pin')}
-            </span>
-          </div>
-        </div>
-        <div className="mp-addr-card mp-addr-drop">
-          <span className="mp-addr-dot mp-dot-red" />
-          <div className="mp-addr-text">
-            <span className="mp-addr-label">Drop</span>
-            <span className="mp-addr-value">
-              {dropAddr || 'Not set — search or tap map'}
-            </span>
-          </div>
-        </div>
-      </div>
+      {/* ── 2. TOP FLOATING CONTROL BAR ── */}
+      <header className="mp-topbar">
+        {/* Back / Close button */}
+        <button className="mp-back-btn" onClick={onClose} aria-label="Close Map">
+          <ArrowLeft size={18} />
+          <span>Back</span>
+        </button>
 
-      {/* ── Live fare estimate ── */}
-      {distance !== null && fare !== null && (
-        <div className="mp-fare-strip">
-          <span className="mp-fare-dist">📏 {distance} km</span>
-          <span className="mp-fare-sep">·</span>
-          <span className="mp-fare-amount">Est. ₹{fare.toLocaleString('en-IN')}</span>
-          <span className="mp-fare-note">Fare updates as you move pins</span>
+        {/* Selected Vehicle Badge */}
+        <div className="mp-vehicle-pill">
+          <span className="mp-vehicle-name">{vehicleType}</span>
+          <span className="mp-vehicle-sep">·</span>
+          <span className="mp-vehicle-rate">₹{vehiclePrice.toLocaleString('en-IN')}{vehiclePriceUnit}</span>
+          <span className="mp-vehicle-eta">({vehicleEta})</span>
+        </div>
+
+        {/* Search Drop Destination */}
+        <div className="mp-search-container" ref={searchRef}>
+          <div className="mp-search-box">
+            <Search size={16} className="mp-search-icon" />
+            <input
+              className="mp-search-field"
+              placeholder="Search destination / drop location…"
+              value={searchQuery}
+              onChange={e => handleSearchInput(e.target.value)}
+              onFocus={() => suggestions.length > 0 && setShowSuggest(true)}
+            />
+            {searchQuery && (
+              <button
+                className="mp-clear-btn"
+                onClick={() => { setSearchQuery(''); setSuggestions([]); setShowSuggest(false) }}
+              >
+                <X size={14} />
+              </button>
+            )}
+            {searchLoad && <Loader size={14} className="mp-spin mp-search-spin" />}
+          </div>
+
+          {/* Search suggestions dropdown */}
+          {showSuggest && suggestions.length > 0 && (
+            <ul className="mp-dropdown-list">
+              {suggestions.map((s, i) => (
+                <li
+                  key={i}
+                  className="mp-dropdown-item"
+                  onMouseDown={() => handleSuggestionClick(s)}
+                >
+                  <Navigation2 size={13} className="mp-dropdown-icon" />
+                  <span>{s.display_name}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+
+        {/* Use My Location (GPS) Button */}
+        <button
+          className={`mp-gps-action-btn ${gpsLoading ? 'mp-gps-active' : ''}`}
+          onClick={handleGps}
+          disabled={gpsLoading}
+          title="Detect and use my current location as pickup point"
+        >
+          {gpsLoading ? <Loader size={15} className="mp-spin" /> : <Locate size={15} />}
+          <span>{gpsLoading ? 'Locating…' : 'Use My Location'}</span>
+        </button>
+      </header>
+
+      {/* ── 3. GPS ERROR BANNER (if any) ── */}
+      {gpsError && (
+        <div className="mp-error-banner">
+          ⚠ {gpsError}
         </div>
       )}
+
+      {/* ── 4. FLOATING HINT OVERLAY ── */}
+      {!pickup && !drop && (
+        <div className="mp-floating-hint">
+          <p>
+            📍 Click <strong>"Use My Location"</strong> for pickup, then <strong>tap the map</strong> to set your drop point.
+          </p>
+        </div>
+      )}
+      {pickup && !drop && (
+        <div className="mp-floating-hint mp-hint-pulse">
+          <p>
+            🔴 Now <strong>tap anywhere on the map</strong> or use the search bar above to set your destination.
+          </p>
+        </div>
+      )}
+
+      {/* ── 5. MAP LEGEND ── */}
+      <div className="mp-map-legend">
+        <span className="mp-legend-tag"><span className="mp-tag-dot mp-dot-green" /> 🟢 Pickup (Drag pin)</span>
+        <span className="mp-legend-tag"><span className="mp-tag-dot mp-dot-red" /> 🔴 Drop (Drag pin)</span>
+      </div>
+
+      {/* ── 6. BOTTOM FLOATING BOOKING CARD ── */}
+      <footer className="mp-bottom-card">
+        <div className="mp-card-grid">
+
+          {/* Locations Summary */}
+          <div className="mp-locations-block">
+            {/* Pickup */}
+            <div className="mp-loc-item">
+              <span className="mp-pin-icon mp-pin-green" />
+              <div className="mp-loc-info">
+                <span className="mp-loc-title">Pickup Location</span>
+                <span className="mp-loc-addr" title={pickupAddr}>
+                  {pickupAddr || (gpsLoading ? 'Detecting current GPS location…' : 'Not selected — tap GPS or map')}
+                </span>
+              </div>
+            </div>
+
+            <div className="mp-loc-divider" />
+
+            {/* Drop */}
+            <div className="mp-loc-item">
+              <span className="mp-pin-icon mp-pin-red" />
+              <div className="mp-loc-info">
+                <span className="mp-loc-title">Drop Destination</span>
+                <span className="mp-loc-addr" title={dropAddr}>
+                  {dropAddr || 'Not selected — search above or tap map'}
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Route & Fare Calculation */}
+          <div className="mp-fare-block">
+            <div className="mp-fare-details">
+              <div className="mp-fare-label">
+                {distance !== null ? `Trip Distance: ${distance} km` : 'Estimated Distance'}
+              </div>
+              <div className="mp-fare-amount">
+                {fare !== null ? (
+                  `₹${fare.toLocaleString('en-IN')}`
+                ) : (
+                  `₹${(vehiclePrice * 3).toLocaleString('en-IN')} – ₹${(vehiclePrice * 7).toLocaleString('en-IN')}`
+                )}
+              </div>
+              <div className="mp-fare-note">
+                <Shield size={12} /> Standard Fare · Live Calculated
+              </div>
+            </div>
+
+            {/* Confirm Button */}
+            <button
+              className="mp-confirm-btn"
+              disabled={!pickup || !drop}
+              onClick={onConfirm}
+            >
+              <Navigation size={18} />
+              <span>Confirm {vehicleType}</span>
+            </button>
+          </div>
+
+        </div>
+      </footer>
+
     </div>
   )
 }

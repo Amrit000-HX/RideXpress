@@ -1,259 +1,489 @@
 /* ══════════════════════════════════════════════════════
-   MapPicker.css — Styles for the interactive map picker
+   MapPicker.css — Full-Window Map Experience
+   Theme: RideXpress Cream #F5F0E8 · Sage #6B9E72 · Charcoal #1A1A1A
    ══════════════════════════════════════════════════════ */
 
-.mp-wrap {
+.mp-fullscreen {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 10000;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  background: #1A1A1A;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  overflow: hidden;
+}
+
+/* ── 1. Full-Window Map Canvas ─────────────────────── */
+.mp-map-canvas {
+  position: absolute;
+  inset: 0;
   width: 100%;
+  height: 100%;
+  z-index: 1;
 }
 
-/* ── Controls bar ──────────────────────────────────── */
-.mp-controls {
+.mp-map-canvas .leaflet-container {
+  width: 100%;
+  height: 100%;
+  background: #e5e3df;
+  font-family: inherit;
+}
+
+.mp-map-canvas .leaflet-control-attribution {
+  font-size: 10px;
+  background: rgba(245, 240, 232, 0.85);
+  backdrop-filter: blur(4px);
+  padding: 3px 8px;
+  border-radius: 6px 0 0 0;
+  color: #555;
+}
+
+/* ── 2. Top Floating Navigation Bar ────────────────── */
+.mp-topbar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  right: 16px;
+  z-index: 20;
   display: flex;
-  gap: 8px;
-  align-items: flex-start;
+  align-items: center;
+  gap: 12px;
+  background: rgba(245, 240, 232, 0.94);
+  backdrop-filter: blur(14px);
+  padding: 10px 16px;
+  border-radius: 16px;
+  border: 1px solid rgba(26, 26, 26, 0.12);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.18), 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* GPS button */
-.mp-gps-btn {
+/* Back Button */
+.mp-back-btn {
   display: flex;
   align-items: center;
   gap: 6px;
-  padding: 9px 14px;
+  padding: 8px 14px;
   background: #1A1A1A;
   color: #F5F0E8;
   border: none;
   border-radius: 10px;
-  font-size: 12px;
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   cursor: pointer;
   white-space: nowrap;
-  transition: opacity 0.2s, transform 0.1s;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
   flex-shrink: 0;
 }
-.mp-gps-btn:hover:not(:disabled) { opacity: 0.85; transform: translateY(-1px); }
-.mp-gps-btn:disabled              { opacity: 0.6; cursor: not-allowed; }
-.mp-gps-loading                   { background: #6B9E72; }
-
-/* Search */
-.mp-search-wrap {
-  position: relative;
-  flex: 1;
+.mp-back-btn:hover {
+  background: #333;
+  transform: translateX(-2px);
 }
-.mp-search-row {
+
+/* Vehicle Badge Pill */
+.mp-vehicle-pill {
   display: flex;
   align-items: center;
-  gap: 8px;
-  background: rgba(26, 26, 26, 0.06);
-  border: 1.5px solid rgba(26, 26, 26, 0.12);
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(107, 158, 114, 0.15);
+  border: 1px solid rgba(107, 158, 114, 0.35);
   border-radius: 10px;
-  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #1A1A1A;
+  flex-shrink: 0;
 }
-.mp-search-icon   { color: rgba(26,26,26,0.45); flex-shrink: 0; }
-.mp-search-input  {
+.mp-vehicle-name {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.mp-vehicle-sep {
+  color: rgba(26, 26, 26, 0.3);
+}
+.mp-vehicle-rate {
+  color: #2e6035;
+}
+.mp-vehicle-eta {
+  color: rgba(26, 26, 26, 0.6);
+  font-size: 11px;
+}
+
+/* Search Drop Location */
+.mp-search-container {
+  position: relative;
+  flex: 1;
+  min-width: 200px;
+}
+.mp-search-box {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #ffffff;
+  border: 1.5px solid rgba(26, 26, 26, 0.15);
+  border-radius: 10px;
+  padding: 8px 14px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.mp-search-icon {
+  color: rgba(26, 26, 26, 0.45);
+  flex-shrink: 0;
+}
+.mp-search-field {
   flex: 1;
   border: none;
   background: transparent;
-  font-size: 13px;
+  font-size: 13.5px;
   color: #1A1A1A;
   outline: none;
+  font-family: inherit;
 }
-.mp-search-input::placeholder { color: rgba(26,26,26,0.35); }
-.mp-search-clear  {
+.mp-search-field::placeholder {
+  color: rgba(26, 26, 26, 0.4);
+}
+.mp-clear-btn {
   background: none;
   border: none;
   cursor: pointer;
-  color: rgba(26,26,26,0.4);
+  color: rgba(26, 26, 26, 0.4);
   padding: 0;
   display: flex;
   align-items: center;
 }
-.mp-search-spin   { color: #6B9E72; }
-
-/* Suggestions */
-.mp-suggest-list {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0; right: 0;
-  background: #fff;
-  border: 1.5px solid rgba(26,26,26,0.12);
-  border-radius: 10px;
-  list-style: none;
-  margin: 0; padding: 4px;
-  z-index: 9999;
-  max-height: 200px;
-  overflow-y: auto;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-}
-.mp-suggest-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 9px 10px;
-  border-radius: 7px;
-  cursor: pointer;
-  font-size: 12px;
+.mp-clear-btn:hover {
   color: #1A1A1A;
-  line-height: 1.4;
-  transition: background 0.15s;
 }
-.mp-suggest-item:hover   { background: rgba(107,158,114,0.1); }
-.mp-suggest-icon         { color: #6B9E72; flex-shrink: 0; margin-top: 2px; }
-
-/* GPS error */
-.mp-gps-error {
-  font-size: 12px;
-  color: #c0392b;
-  background: rgba(192, 57, 43, 0.07);
-  border: 1px solid rgba(192,57,43,0.2);
-  padding: 8px 12px;
-  border-radius: 8px;
+.mp-search-spin {
+  color: #6B9E72;
 }
 
-/* ── Map container ─────────────────────────────────── */
-.mp-map-container {
-  position: relative;
-  height: 280px;
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1.5px solid rgba(26,26,26,0.1);
-}
-
-/* Leaflet overrides */
-.mp-map-container .leaflet-container {
-  font-family: inherit;
-}
-.mp-map-container .leaflet-control-attribution {
-  font-size: 9px;
-  background: rgba(255,255,255,0.7);
-}
-
-/* Legend */
-.mp-legend {
+/* Suggestions Dropdown */
+.mp-dropdown-list {
   position: absolute;
-  bottom: 10px;
-  left: 10px;
-  background: rgba(255,255,255,0.92);
-  backdrop-filter: blur(4px);
-  border-radius: 8px;
-  padding: 5px 10px;
-  display: flex;
-  gap: 12px;
-  z-index: 1000;
-  font-size: 11px;
-  font-weight: 600;
-  color: #1A1A1A;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-}
-.mp-legend-item { display: flex; align-items: center; gap: 5px; }
-
-/* Hint overlays */
-.mp-hint-overlay {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(245,240,232,0.55);
-  backdrop-filter: blur(2px);
-  z-index: 999;
-  pointer-events: none;
-}
-.mp-hint-overlay p {
-  text-align: center;
-  font-size: 13px;
-  font-weight: 600;
-  color: #1A1A1A;
-  background: rgba(255,255,255,0.9);
-  padding: 12px 18px;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  background: #ffffff;
+  border: 1.5px solid rgba(26, 26, 26, 0.12);
   border-radius: 12px;
-  box-shadow: 0 4px 16px rgba(0,0,0,0.1);
-  line-height: 1.6;
+  list-style: none;
+  margin: 0;
+  padding: 6px;
+  z-index: 1000;
+  max-height: 240px;
+  overflow-y: auto;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.15);
 }
-.mp-hint-small {
-  align-items: flex-end;
-  padding-bottom: 16px;
-  background: transparent;
-  backdrop-filter: none;
-}
-.mp-hint-small p {
-  font-size: 11px;
-  padding: 8px 14px;
-}
-
-/* Dots */
-.mp-dot {
-  display: inline-block;
-  width: 9px; height: 9px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.mp-dot-green { background: #6B9E72; }
-.mp-dot-red   { background: #e74c3c; }
-
-/* ── Address cards ─────────────────────────────────── */
-.mp-addr-cards {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-.mp-addr-card {
+.mp-dropdown-item {
   display: flex;
   align-items: flex-start;
   gap: 10px;
   padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(26,26,26,0.04);
-  border: 1.5px solid rgba(26,26,26,0.08);
-}
-.mp-addr-dot { margin-top: 4px; }
-.mp-addr-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1;
-  min-width: 0;
-}
-.mp-addr-label {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: rgba(26,26,26,0.45);
-}
-.mp-addr-value {
-  font-size: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 12.5px;
   color: #1A1A1A;
   line-height: 1.4;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  transition: background 0.15s ease;
+}
+.mp-dropdown-item:hover {
+  background: rgba(107, 158, 114, 0.12);
+}
+.mp-dropdown-icon {
+  color: #6B9E72;
+  flex-shrink: 0;
+  margin-top: 2px;
 }
 
-/* ── Live fare strip ───────────────────────────────── */
-.mp-fare-strip {
+/* Use My Location GPS Button */
+.mp-gps-action-btn {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 14px;
-  background: linear-gradient(135deg, #1A1A1A, #2a2a2a);
+  padding: 9px 16px;
+  background: #6B9E72;
+  color: #ffffff;
+  border: none;
   border-radius: 10px;
-  color: #F5F0E8;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 4px 12px rgba(107, 158, 114, 0.35);
+  flex-shrink: 0;
+}
+.mp-gps-action-btn:hover:not(:disabled) {
+  background: #5a8760;
+  transform: translateY(-1px);
+}
+.mp-gps-action-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+.mp-gps-active {
+  background: #1A1A1A !important;
+}
+
+/* ── 3. Floating Error Banner ──────────────────────── */
+.mp-error-banner {
+  position: absolute;
+  top: 80px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #991b1b;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  padding: 8px 18px;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  animation: mpFadeDown 0.3s ease;
+}
+
+/* ── 4. Floating Hint Overlay ──────────────────────── */
+.mp-floating-hint {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  pointer-events: none;
+  animation: mpFadeDown 0.4s ease;
+}
+.mp-floating-hint p {
+  margin: 0;
   font-size: 13px;
   font-weight: 600;
+  color: #1A1A1A;
+  background: rgba(245, 240, 232, 0.95);
+  backdrop-filter: blur(8px);
+  padding: 10px 20px;
+  border-radius: 30px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.14);
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  text-align: center;
 }
-.mp-fare-sep    { color: rgba(245,240,232,0.3); }
-.mp-fare-amount { color: #6B9E72; font-size: 16px; font-weight: 700; }
-.mp-fare-note   { font-size: 10px; color: rgba(245,240,232,0.4); margin-left: auto; }
-.mp-fare-dist   { color: rgba(245,240,232,0.7); }
+.mp-hint-pulse p {
+  border-color: #e74c3c;
+  background: rgba(255, 255, 255, 0.96);
+}
 
-/* ── Spinner animation ─────────────────────────────── */
-.mp-spin {
-  animation: mp-rotate 0.8s linear infinite;
+/* ── 5. Map Legend ─────────────────────────────────── */
+.mp-map-legend {
+  position: absolute;
+  top: 86px;
+  right: 20px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: rgba(245, 240, 232, 0.92);
+  backdrop-filter: blur(8px);
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
 }
-@keyframes mp-rotate {
+.mp-legend-tag {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+.mp-tag-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+.mp-dot-green { background: #6B9E72; }
+.mp-dot-red   { background: #e74c3c; }
+
+/* ── 6. Bottom Floating Booking Card ───────────────── */
+.mp-bottom-card {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  max-width: 960px;
+  margin: 0 auto;
+  z-index: 20;
+  background: rgba(245, 240, 232, 0.96);
+  backdrop-filter: blur(16px);
+  border-radius: 20px;
+  border: 1px solid rgba(26, 26, 26, 0.12);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.22), 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 18px 24px;
+}
+
+.mp-card-grid {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+/* Locations Block (Left 60%) */
+.mp-locations-block {
+  flex: 1.4;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.7);
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(26, 26, 26, 0.08);
+}
+
+.mp-loc-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+.mp-pin-icon {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.mp-pin-green { background: #6B9E72; box-shadow: 0 0 0 3px rgba(107, 158, 114, 0.2); }
+.mp-pin-red   { background: #e74c3c; box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2); }
+
+.mp-loc-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+.mp-loc-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(26, 26, 26, 0.5);
+}
+.mp-loc-addr {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1A1A;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mp-loc-divider {
+  height: 1px;
+  background: rgba(26, 26, 26, 0.08);
+  margin: 2px 0 2px 22px;
+}
+
+/* Fare & Confirm Block (Right 40%) */
+.mp-fare-block {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.mp-fare-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.mp-fare-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(26, 26, 26, 0.5);
+}
+.mp-fare-amount {
+  font-family: 'Archivo Black', 'Inter', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: -0.02em;
+}
+.mp-fare-note {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: rgba(26, 26, 26, 0.5);
+}
+
+/* Confirm Action Button */
+.mp-confirm-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 16px 28px;
+  background: #1A1A1A;
+  color: #F5F0E8;
+  border: none;
+  border-radius: 14px;
+  font-size: 14.5px;
+  font-weight: 800;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 8px 24px rgba(26, 26, 26, 0.25);
+  white-space: nowrap;
+}
+.mp-confirm-btn:hover:not(:disabled) {
+  background: #333;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 30px rgba(26, 26, 26, 0.35);
+}
+.mp-confirm-btn:disabled {
+  background: rgba(26, 26, 26, 0.25);
+  color: rgba(245, 240, 232, 0.6);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* ── Spinner Animation ─────────────────────────────── */
+.mp-spin {
+  animation: mpRotate 0.8s linear infinite;
+}
+@keyframes mpRotate {
   from { transform: rotate(0deg); }
   to   { transform: rotate(360deg); }
+}
+
+@keyframes mpFadeDown {
+  from { opacity: 0; transform: translate(-50%, -10px); }
+  to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ── Mobile Responsive Layout ──────────────────────── */
+@media (max-width: 900px) {
+  .mp-topbar {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+  .mp-search-container {
+    order: 3;
+    width: 100%;
+    min-width: 100%;
+  }
+  .mp-card-grid {
+    flex-direction: column;
+    gap: 14px;
+    align-items: stretch;
+  }
+  .mp-fare-block {
+    justify-content: space-between;
+  }
+  .mp-confirm-btn {
+    padding: 14px 20px;
+    font-size: 13.5px;
+  }
 }

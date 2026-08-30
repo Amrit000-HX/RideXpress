@@ -9,8 +9,8 @@ import { motion, useMotionValue, useTransform, AnimatePresence } from 'framer-mo
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
-  Clock, Users, ArrowRight, X, Navigation,
-  Shield, CheckCircle2, ChevronDown,
+  Clock, Users, ArrowRight,
+  CheckCircle2, ChevronDown,
 } from 'lucide-react'
 import MapPicker, { type LocationData } from '../components/MapPicker/MapPicker'
 import './BookRide.css'
@@ -310,95 +310,17 @@ function SideIndicator({ vehicles, scrollYProgress }: { vehicles: Vehicle[], scr
   )
 }
 
-/* ── Location Drawer ────────────────────────────────── */
-function LocationDrawer({
-  vehicle, onClose, onConfirm,
-}: {
-  vehicle: Vehicle; onClose: () => void; onConfirm: () => void
-}) {
-  const [pickup, setPickup]         = useState<LocationData | null>(null)
-  const [drop, setDrop]             = useState<LocationData | null>(null)
-  const [distanceKm, setDistanceKm] = useState<number | null>(null)
-  const [fare, setFare]             = useState<number | null>(null)
-
-  return (
-    <motion.div
-      className="bk-overlay"
-      initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-      onClick={e => e.target === e.currentTarget && onClose()}
-    >
-      <motion.div
-        className="bk-drawer"
-        initial={{ y: '100%' }} animate={{ y: 0 }} exit={{ y: '100%' }}
-        transition={{ type: 'spring', damping: 28, stiffness: 280 }}
-      >
-        {/* Handle */}
-        <div className="bk-drawer-handle" />
-
-        {/* Header */}
-        <div className="bk-drawer-head">
-          <div>
-            <h3 className="bk-drawer-vehicle">{vehicle.type}</h3>
-            <span className="bk-drawer-price">
-              ₹{vehicle.price.toLocaleString('en-IN')}{vehicle.priceUnit} · {vehicle.eta}
-            </span>
-          </div>
-          <button className="bk-close-btn" onClick={onClose}><X size={18} /></button>
-        </div>
-
-        {/* Map & Location Selection */}
-        <div className="bk-drawer-body">
-          <MapPicker
-            vehiclePrice={vehicle.price}
-            onPickupChange={setPickup}
-            onDropChange={setDrop}
-            onDistanceChange={(km, f) => {
-              setDistanceKm(km)
-              setFare(f)
-            }}
-          />
-        </div>
-
-        {/* Footer */}
-        <div className="bk-drawer-foot">
-          <div className="bk-fare-est">
-            <div>
-              <div className="bk-fare-label">
-                {distanceKm !== null ? `Estimated Fare (${distanceKm} km)` : 'Estimated fare (5 km)'}
-              </div>
-              <div className="bk-fare-range">
-                {fare !== null ? (
-                  `₹${fare.toLocaleString('en-IN')}`
-                ) : (
-                  `₹${(vehicle.price * 3).toLocaleString('en-IN')} – ₹${(vehicle.price * 7).toLocaleString('en-IN')}`
-                )}
-              </div>
-            </div>
-            <div className="bk-fare-note">
-              <Shield size={12} /> Secure payment
-            </div>
-          </div>
-          <button
-            className="bk-confirm-btn"
-            disabled={!pickup || !drop}
-            onClick={onConfirm}
-          >
-            <Navigation size={16} />
-            Confirm {vehicle.type}
-          </button>
-        </div>
-      </motion.div>
-    </motion.div>
-  )
-}
-
 /* ── Main Page ──────────────────────────────────────── */
 export default function BookRide() {
   const navigate = useNavigate()
   const { isAuthenticated } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
-  const [selected, setSelected] = useState<Vehicle | null>(null)
-  const [confirmed, setConfirmed] = useState(false)
+  const [selected, setSelected]       = useState<Vehicle | null>(null)
+  const [confirmed, setConfirmed]     = useState(false)
+  const [, setPickupLoc] = useState<LocationData | null>(null)
+  const [, setDropLoc]   = useState<LocationData | null>(null)
+  const [, setDistanceKm]= useState<number | null>(null)
+  const [, setFare]      = useState<number | null>(null)
 
   /* Auth guard */
   useEffect(() => {
@@ -491,14 +413,31 @@ export default function BookRide() {
       {/* Fixed side progress indicator */}
       <SideIndicator vehicles={vehicles} scrollYProgress={scrollYProgress} />
 
-      {/* Location drawer */}
+      {/* Full-Window Interactive Map Modal */}
       <AnimatePresence>
         {selected && (
-          <LocationDrawer
-            vehicle={selected}
-            onClose={() => setSelected(null)}
-            onConfirm={handleConfirm}
-          />
+          <motion.div
+            key="map-fullwindow"
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.98 }}
+            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
+          >
+            <MapPicker
+              vehicleType={selected.type}
+              vehiclePrice={selected.price}
+              vehiclePriceUnit={selected.priceUnit}
+              vehicleEta={selected.eta}
+              onClose={() => setSelected(null)}
+              onConfirm={handleConfirm}
+              onPickupChange={setPickupLoc}
+              onDropChange={setDropLoc}
+              onDistanceChange={(km, f) => {
+                setDistanceKm(km)
+                setFare(f)
+              }}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
 
