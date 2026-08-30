@@ -1,7 +1,9 @@
 const bcrypt = require('bcryptjs')
 const User = require('../models/User')
 const Employee = require('../models/Employee')
+const Otp = require('../models/Otp')
 const { generateToken } = require('../utils/generateToken')
+const { sendOtpEmail } = require('../utils/emailService')
 
 const SALT_ROUNDS = 10
 
@@ -66,18 +68,18 @@ exports.registerUser = async (req, res) => {
     })
   } catch (err) {
     console.error('[registerUser]', err)
-    // Mongoose duplicate key
     if (err.code === 11000) {
-      return res.status(409).json({ success: false, message: 'Email already registered.' })
+      return res.status(409).json({
+        success: false,
+        message: 'An account with this email already exists.',
+      })
     }
     res.status(500).json({ success: false, message: 'Server error. Please try again later.' })
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   POST /api/auth/register/employee   — Protected (admin) in production
-   In this demo, the route is open so new drivers can self-register.
-   The backend sets role: 'employee' and never trusts a role from the client.
+   POST /api/auth/register/employee   — Public / Admin
    ═══════════════════════════════════════════════════════════════ */
 exports.registerEmployee = async (req, res) => {
   try {
@@ -97,16 +99,16 @@ exports.registerEmployee = async (req, res) => {
       })
     }
 
-    // ── Duplicate email check ─────────────────────────────────
-    const emailExists = await Employee.findOne({ email: email.toLowerCase().trim() })
-    if (emailExists) {
+    // ── Duplicate check ───────────────────────────────────────
+    const exists = await Employee.findOne({ email: email.toLowerCase().trim() })
+    if (exists) {
       return res.status(409).json({
         success: false,
         message: 'An employee account with this email already exists.',
       })
     }
 
-    // ── Generate unique employeeId ────────────────────────────
+    // ── Auto-generate sequential employee ID (EMP-000001) ─────
     const count = await Employee.countDocuments()
     const employeeId = `EMP-${String(count + 1).padStart(6, '0')}`
 
@@ -123,7 +125,7 @@ exports.registerEmployee = async (req, res) => {
       department: department?.trim() || 'Delivery',
       designation: designation?.trim() || 'Rider',
       vehicleCategory: vehicleCategory?.trim() || '',
-      role: 'employee',   // NEVER trust role from the client
+      role: 'employee',
       isActive: true,
     })
 
@@ -131,7 +133,7 @@ exports.registerEmployee = async (req, res) => {
 
     return res.status(201).json({
       success: true,
-      message: 'Employee registration successful.',
+      message: 'Employee registered successfully.',
       token,
       user: {
         id: employee._id,
@@ -139,8 +141,10 @@ exports.registerEmployee = async (req, res) => {
         name: employee.name,
         email: employee.email,
         phone: employee.phone,
-        role: employee.role,
+        department: employee.department,
+        designation: employee.designation,
         vehicleCategory: employee.vehicleCategory,
+        role: employee.role,
       },
     })
   } catch (err) {
@@ -157,35 +161,26 @@ exports.registerEmployee = async (req, res) => {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   POST /api/auth/login   — Public
-   Body: { email, password, accountType: 'user' | 'employee' }
+   POST /api/auth/login-request   — Public (Step 1 of 2-Step Auth)
+   Verifies email & password, generates 6-digit OTP, sends to Email
    ═══════════════════════════════════════════════════════════════ */
-exports.login = async (req, res) => {
+exports.loginRequest = async (req, res) => {
   try {
-    const { email, password, accountType } = req.body
+    const { email, password, accountType = 'user' } = req.body
 
-    // ── Input validation ──────────────────────────────────────
-    if (!email || !password || !accountType) {
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        message: 'Email, password, and account type are required.',
-      })
-    }
-    if (!['user', 'employee'].includes(accountType)) {
-      return res.status(400).json({
-        success: false,
-        message: 'Account type must be "user" or "employee".',
+        message: 'Email/Employee ID and password are required.',
       })
     }
 
-    // ── Find account in the correct collection ────────────────
-    let account = null
     const identifier = email.trim()
+    let account = null
+
     if (accountType === 'user') {
-      // Must explicitly select passwordHash since it's select: false in schema
       account = await User.findOne({ email: identifier.toLowerCase() }).select('+passwordHash')
     } else {
-      // Employee login accepts either email OR employeeId (e.g. EMP-000001)
       account = await Employee.findOne({
         $or: [
           { email: identifier.toLowerCase() },
@@ -194,17 +189,12 @@ exports.login = async (req, res) => {
         ],
       }).select('+passwordHash')
 
-      // If not found in employees, allow admin account to access employee dashboard too
       if (!account) {
         const adminAccount = await User.findOne({ email: identifier.toLowerCase(), role: 'admin' }).select('+passwordHash')
-        if (adminAccount) {
-          account = adminAccount
-        }
+        if (adminAccount) account = adminAccount
       }
     }
 
-    // ── Account not found ─────────────────────────────────────
-    // Use a generic message to avoid user enumeration
     if (!account) {
       return res.status(401).json({
         success: false,
@@ -212,7 +202,6 @@ exports.login = async (req, res) => {
       })
     }
 
-    // ── Inactive account ──────────────────────────────────────
     if (!account.isActive) {
       return res.status(401).json({
         success: false,
@@ -220,7 +209,6 @@ exports.login = async (req, res) => {
       })
     }
 
-    // ── Password comparison ───────────────────────────────────
     const isMatch = await bcrypt.compare(password, account.passwordHash)
     if (!isMatch) {
       return res.status(401).json({
@@ -229,10 +217,219 @@ exports.login = async (req, res) => {
       })
     }
 
-    // ── Generate JWT ──────────────────────────────────────────
+    // ── Generate 6-digit random verification OTP ──────────────
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+
+    // ── Store in Otp collection (replacing old OTP for this email)
+    await Otp.deleteMany({ email: account.email.toLowerCase() })
+    await Otp.create({
+      email: account.email.toLowerCase(),
+      otp: otpCode,
+      accountType: account.role === 'employee' ? 'employee' : 'user',
+    })
+
+    // ── Dispatch email ────────────────────────────────────────
+    await sendOtpEmail({
+      to: account.email,
+      otp: otpCode,
+      name: account.name,
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: `Verification code sent to ${account.email}.`,
+      email: account.email,
+      accountType: account.role === 'employee' ? 'employee' : 'user',
+      devOtp: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
+    })
+  } catch (err) {
+    console.error('[loginRequest]', err)
+    res.status(500).json({ success: false, message: 'Server error during login request.' })
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POST /api/auth/verify-otp   — Public (Step 2 of 2-Step Auth)
+   Validates 6-digit OTP from email, deletes OTP, issues JWT token
+   ═══════════════════════════════════════════════════════════════ */
+exports.verifyOtp = async (req, res) => {
+  try {
+    const { email, otp, accountType = 'user' } = req.body
+
+    if (!email || !otp) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email and 6-digit OTP code are required.',
+      })
+    }
+
+    const cleanEmail = email.toLowerCase().trim()
+    const cleanOtp = otp.trim()
+
+    // ── Check OTP record in database ──────────────────────────
+    const otpRecord = await Otp.findOne({ email: cleanEmail, otp: cleanOtp })
+
+    // Also support fallback demo code '123456' for offline dev testing if needed
+    const isValidDemoCode = process.env.NODE_ENV !== 'production' && cleanOtp === '123456'
+
+    if (!otpRecord && !isValidDemoCode) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid or expired verification code. Please request a new one.',
+      })
+    }
+
+    // Delete used OTP
+    await Otp.deleteMany({ email: cleanEmail })
+
+    // ── Retrieve user / employee account ──────────────────────
+    let account = null
+    if (accountType === 'user') {
+      account = await User.findOne({ email: cleanEmail })
+    } else {
+      account = await Employee.findOne({ email: cleanEmail })
+      if (!account) {
+        account = await User.findOne({ email: cleanEmail, role: 'admin' })
+      }
+    }
+
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Account not found.' })
+    }
+
+    // ── Generate JWT token ────────────────────────────────────
     const token = generateToken({ id: account._id, role: account.role })
 
-    // ── Build safe profile (no passwordHash) ──────────────────
+    // ── Safe profile ──────────────────────────────────────────
+    const profile = {
+      id: account._id,
+      name: account.name,
+      email: account.email,
+      phone: account.phone,
+      role: account.role,
+    }
+    if (account.employeeId) {
+      profile.employeeId = account.employeeId
+      profile.vehicleCategory = account.vehicleCategory
+    }
+    if (account.city) profile.city = account.city
+
+    return res.status(200).json({
+      success: true,
+      message: 'Authentication successful. Welcome!',
+      token,
+      user: profile,
+    })
+  } catch (err) {
+    console.error('[verifyOtp]', err)
+    res.status(500).json({ success: false, message: 'Server error during OTP verification.' })
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POST /api/auth/resend-otp   — Public
+   Generates a new 6-digit OTP and re-sends to email
+   ═══════════════════════════════════════════════════════════════ */
+exports.resendOtp = async (req, res) => {
+  try {
+    const { email, accountType = 'user' } = req.body
+
+    if (!email) {
+      return res.status(400).json({ success: false, message: 'Email is required.' })
+    }
+
+    const cleanEmail = email.toLowerCase().trim()
+    let account = null
+
+    if (accountType === 'user') {
+      account = await User.findOne({ email: cleanEmail })
+    } else {
+      account = await Employee.findOne({
+        $or: [{ email: cleanEmail }, { employeeId: cleanEmail.toUpperCase() }],
+      })
+      if (!account) {
+        account = await User.findOne({ email: cleanEmail, role: 'admin' })
+      }
+    }
+
+    if (!account) {
+      return res.status(404).json({ success: false, message: 'Account not found.' })
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString()
+
+    await Otp.deleteMany({ email: account.email.toLowerCase() })
+    await Otp.create({
+      email: account.email.toLowerCase(),
+      otp: otpCode,
+      accountType: account.role === 'employee' ? 'employee' : 'user',
+    })
+
+    await sendOtpEmail({
+      to: account.email,
+      otp: otpCode,
+      name: account.name,
+    })
+
+    return res.status(200).json({
+      success: true,
+      message: `A new verification code has been sent to ${account.email}.`,
+      devOtp: process.env.NODE_ENV !== 'production' ? otpCode : undefined,
+    })
+  } catch (err) {
+    console.error('[resendOtp]', err)
+    res.status(500).json({ success: false, message: 'Server error during OTP resend.' })
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   POST /api/auth/login   — Direct login (backward compatible)
+   ═══════════════════════════════════════════════════════════════ */
+exports.login = async (req, res) => {
+  try {
+    const { email, password, accountType } = req.body
+
+    if (!email || !password || !accountType) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email, password, and account type are required.',
+      })
+    }
+
+    let account = null
+    const identifier = email.trim()
+    if (accountType === 'user') {
+      account = await User.findOne({ email: identifier.toLowerCase() }).select('+passwordHash')
+    } else {
+      account = await Employee.findOne({
+        $or: [
+          { email: identifier.toLowerCase() },
+          { employeeId: identifier.toUpperCase() },
+          { employeeId: identifier },
+        ],
+      }).select('+passwordHash')
+
+      if (!account) {
+        const adminAccount = await User.findOne({ email: identifier.toLowerCase(), role: 'admin' }).select('+passwordHash')
+        if (adminAccount) account = adminAccount
+      }
+    }
+
+    if (!account) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' })
+    }
+
+    if (!account.isActive) {
+      return res.status(401).json({ success: false, message: 'This account has been deactivated.' })
+    }
+
+    const isMatch = await bcrypt.compare(password, account.passwordHash)
+    if (!isMatch) {
+      return res.status(401).json({ success: false, message: 'Invalid email or password.' })
+    }
+
+    const token = generateToken({ id: account._id, role: account.role })
+
     const profile = {
       id: account._id,
       name: account.name,
@@ -254,20 +451,19 @@ exports.login = async (req, res) => {
     })
   } catch (err) {
     console.error('[login]', err)
-    res.status(500).json({ success: false, message: 'Server error. Please try again later.' })
+    res.status(500).json({ success: false, message: 'Server error.' })
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   GET /api/auth/me   — Protected (any authenticated account)
+   GET /api/auth/me   — Protected
    ═══════════════════════════════════════════════════════════════ */
 exports.getMe = async (req, res) => {
   try {
     const { id, role } = req.user
-
     let account = null
     if (role === 'user' || role === 'admin') {
-      account = await User.findById(id)   // passwordHash excluded by default (select: false)
+      account = await User.findById(id)
     } else {
       account = await Employee.findById(id)
     }
@@ -285,8 +481,7 @@ exports.getMe = async (req, res) => {
 
 /* ═══════════════════════════════════════════════════════════════
    POST /api/auth/logout   — Protected
-   JWT is stateless; inform the client to discard the token.
    ═══════════════════════════════════════════════════════════════ */
 exports.logout = (_req, res) => {
-  res.status(200).json({ success: true, message: 'Logged out successfully.' })
+  return res.status(200).json({ success: true, message: 'Logged out successfully.' })
 }

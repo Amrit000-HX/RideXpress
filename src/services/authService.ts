@@ -19,6 +19,14 @@ export interface AuthResponse {
   user: UserProfile
 }
 
+export interface LoginRequestResponse {
+  success: boolean
+  message: string
+  email: string
+  accountType: 'user' | 'employee'
+  devOtp?: string
+}
+
 /* ═══════════════════════════════════════════════════════════════
    Register a new customer account
    ═══════════════════════════════════════════════════════════════ */
@@ -50,7 +58,40 @@ export const registerEmployee = async (data: {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Login — accountType must be 'user' or 'employee'
+   2-Step OTP Authentication Endpoints
+   ═══════════════════════════════════════════════════════════════ */
+
+/** Step 1: Validate password & send 6-digit OTP to email */
+export const loginRequest = async (data: {
+  email: string
+  password: string
+  accountType: 'user' | 'employee'
+}): Promise<LoginRequestResponse> => {
+  const res = await api.post<LoginRequestResponse>('/auth/login-request', data)
+  return res.data
+}
+
+/** Step 2: Validate 6-digit OTP code & receive JWT session */
+export const verifyOtp = async (data: {
+  email: string
+  otp: string
+  accountType: 'user' | 'employee'
+}): Promise<AuthResponse> => {
+  const res = await api.post<AuthResponse>('/auth/verify-otp', data)
+  return res.data
+}
+
+/** Resend 6-digit OTP code to email */
+export const resendOtp = async (data: {
+  email: string
+  accountType: 'user' | 'employee'
+}): Promise<{ success: boolean; message: string; devOtp?: string }> => {
+  const res = await api.post<{ success: boolean; message: string; devOtp?: string }>('/auth/resend-otp', data)
+  return res.data
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Direct Login (Backward compatibility)
    ═══════════════════════════════════════════════════════════════ */
 export const login = async (data: {
   email: string
@@ -70,12 +111,12 @@ export const getMe = async (): Promise<{ success: boolean; user: UserProfile }> 
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   Logout — inform the server (for future refresh-token support)
+   Logout
    ═══════════════════════════════════════════════════════════════ */
 export const logout = async (): Promise<void> => {
   try {
     await api.post('/auth/logout')
   } catch {
-    // Ignore logout errors — the client will clear the token regardless
+    // Client will clear token regardless
   }
 }

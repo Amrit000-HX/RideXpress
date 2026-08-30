@@ -269,7 +269,6 @@ export default function LoginPage() {
   const [otp, setOtp]                 = useState(['', '', '', '', '', ''])
   const [generatedOtp, setGeneratedOtp]= useState('482910')
   const [resendTimer, setResendTimer] = useState(30)
-  const [pendingAuth, setPendingAuth] = useState<{ token: string; user: any } | null>(null)
   const [verifying, setVerifying]     = useState(false)
   const [verifiedSuccess, setVerifiedSuccess] = useState(false)
 
@@ -285,7 +284,7 @@ export default function LoginPage() {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) =>
     setForm(f => ({ ...f, [e.target.name]: e.target.value }))
 
-  /* ── Step 1: Validate Credentials & Generate OTP ── */
+  /* ── Step 1: Validate Credentials & Send Email OTP ── */
   const handleCredentialsSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
@@ -303,19 +302,18 @@ export default function LoginPage() {
 
     setSubmitting(true)
     try {
-      // Validate credentials against MongoDB backend
-      const result = await authService.login({
+      // Validate credentials & request real OTP from MongoDB backend
+      const result = await authService.loginRequest({
         email: emailToUse,
         password: form.password,
         accountType: mode === 'customer' ? 'user' : 'employee',
       })
 
-      // Store pending auth details
-      setPendingAuth({ token: result.token, user: result.user })
+      // Store server dev OTP if returned (for instant dev testing)
+      if (result.devOtp) {
+        setGeneratedOtp(result.devOtp)
+      }
 
-      // Generate a dynamic 6-digit verification code
-      const newCode = Math.floor(100000 + Math.random() * 900000).toString()
-      setGeneratedOtp(newCode)
       setOtp(['', '', '', '', '', ''])
       setResendTimer(30)
 
@@ -328,8 +326,8 @@ export default function LoginPage() {
     }
   }
 
-  /* ── Step 2: Verify OTP & Complete Login ─────────── */
-  const handleOtpVerify = (e: React.FormEvent) => {
+  /* ── Step 2: Verify OTP with Server & Complete Login ── */
+  const handleOtpVerify = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
     const entered = otp.join('')
@@ -339,35 +337,51 @@ export default function LoginPage() {
       return
     }
 
-    setVerifying(true)
+    const emailToUse = mode === 'customer' ? form.email.trim() : (form.employeeId.trim() || form.email.trim())
 
-    // Verify entered code against generated OTP (or demo code '123456')
-    if (entered === generatedOtp || entered === '123456') {
+    setVerifying(true)
+    try {
+      // Verify OTP with backend API
+      const result = await authService.verifyOtp({
+        email: emailToUse,
+        otp: entered,
+        accountType: mode === 'customer' ? 'user' : 'employee',
+      })
+
       setVerifiedSuccess(true)
       setTimeout(() => {
-        if (pendingAuth) {
-          loginWithCredentials(pendingAuth.token, pendingAuth.user)
-        }
+        loginWithCredentials(result.token, result.user)
         if (mode === 'customer') {
           const destination = (location.state as any)?.from || '/book'
           navigate(destination)
         } else {
           navigate('/employee-dashboard')
         }
-      }, 600)
-    } else {
+      }, 500)
+    } catch (err: any) {
+      setError(err.message || 'Invalid or expired verification code.')
+    } finally {
       setVerifying(false)
-      setError('Invalid verification code. Please check and try again.')
     }
   }
 
-  /* ── Resend Code ─────────────────────────────────── */
-  const handleResendOtp = () => {
-    const newCode = Math.floor(100000 + Math.random() * 900000).toString()
-    setGeneratedOtp(newCode)
-    setOtp(['', '', '', '', '', ''])
-    setResendTimer(30)
+  /* ── Resend Code via Server ──────────────────────── */
+  const handleResendOtp = async () => {
     setError('')
+    const emailToUse = mode === 'customer' ? form.email.trim() : (form.employeeId.trim() || form.email.trim())
+    try {
+      const result = await authService.resendOtp({
+        email: emailToUse,
+        accountType: mode === 'customer' ? 'user' : 'employee',
+      })
+      if (result.devOtp) {
+        setGeneratedOtp(result.devOtp)
+      }
+      setOtp(['', '', '', '', '', ''])
+      setResendTimer(30)
+    } catch (err: any) {
+      setError(err.message || 'Could not resend OTP. Please try again.')
+    }
   }
 
   /* ── Switch Mode (Reset everything) ──────────────── */
@@ -376,7 +390,6 @@ export default function LoginPage() {
     setStep('credentials')
     setShowPass(false)
     setError('')
-    setPendingAuth(null)
     setForm({ email: '', employeeId: '', password: '' })
     setOtp(['', '', '', '', '', ''])
   }
