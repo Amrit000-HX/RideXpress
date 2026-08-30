@@ -10,7 +10,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   Clock, Users, ArrowRight,
-  CheckCircle2, ChevronDown,
+  ChevronDown,
 } from 'lucide-react'
 import MapPicker, { type LocationData } from '../components/MapPicker/MapPicker'
 import './BookRide.css'
@@ -313,14 +313,13 @@ function SideIndicator({ vehicles, scrollYProgress }: { vehicles: Vehicle[], scr
 /* ── Main Page ──────────────────────────────────────── */
 export default function BookRide() {
   const navigate = useNavigate()
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, user } = useAuth()
   const containerRef = useRef<HTMLDivElement>(null)
   const [selected, setSelected]       = useState<Vehicle | null>(null)
-  const [confirmed, setConfirmed]     = useState(false)
-  const [, setPickupLoc] = useState<LocationData | null>(null)
-  const [, setDropLoc]   = useState<LocationData | null>(null)
-  const [, setDistanceKm]= useState<number | null>(null)
-  const [, setFare]      = useState<number | null>(null)
+  const [pickupLoc, setPickupLoc]     = useState<LocationData | null>(null)
+  const [dropLoc, setDropLoc]         = useState<LocationData | null>(null)
+  const [distanceKm, setDistanceKm]   = useState<number | null>(null)
+  const [fare, setFare]               = useState<number | null>(null)
 
   /* Auth guard */
   useEffect(() => {
@@ -362,9 +361,33 @@ export default function BookRide() {
   }, [scrollYProgress])
 
   const handleConfirm = () => {
+    if (!selected) return
+
+    const rideData = {
+      bookingId: `RX-RIDE-${Math.floor(100000 + Math.random() * 900000)}`,
+      customerName: user?.name || 'Customer',
+      customerEmail: user?.email || 'customer@ridexpress.com',
+      customerPhone: user?.phone || '+91 98765 43210',
+      pickupAddress: pickupLoc?.address || 'Current Location (GPS), Main Road',
+      dropAddress: dropLoc?.address || 'Selected Destination, Sector 5',
+      vehicleType: selected.type,
+      vehicleImage: selected.img,
+      distanceKm: distanceKm || 5.8,
+      totalFare: fare || (selected.price * 5),
+      driverName: 'Arjun Mehta',
+      driverPhone: '+91 98451 23098',
+      driverVehicleNumber: 'MH 02 EQ 8492',
+      driverRating: 4.94,
+      startRidePin: Math.floor(1000 + Math.random() * 9000).toString(),
+      paymentMethod: 'Cash on Delivery / UPI',
+      bookedAt: new Date().toLocaleString('en-IN', {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      }),
+    }
+
     setSelected(null)
-    setConfirmed(true)
-    setTimeout(() => setConfirmed(false), 3500)
+    navigate('/ride-receipt', { state: rideData })
   }
 
   if (!isAuthenticated) return null
@@ -437,21 +460,6 @@ export default function BookRide() {
                 setFare(f)
               }}
             />
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Success toast */}
-      <AnimatePresence>
-        {confirmed && (
-          <motion.div
-            className="bk-toast"
-            initial={{ opacity: 0, y: 60 }} animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 60 }}
-            transition={{ type: 'spring', damping: 24 }}
-          >
-            <CheckCircle2 size={18} />
-            Ride confirmed! Your driver is on the way.
           </motion.div>
         )}
       </AnimatePresence>

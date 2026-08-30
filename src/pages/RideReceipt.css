@@ -1,0 +1,606 @@
+/* ══════════════════════════════════════════════════════
+   RideReceipt.css — Ride Booking Confirmation & Bill
+   Theme: Cream #F5F0E8 · Sage #6B9E72 · Charcoal #1A1A1A
+   ══════════════════════════════════════════════════════ */
+
+.rc-page {
+  min-height: 100vh;
+  background-color: #F5F0E8;
+  padding: 48px 20px 80px;
+  display: flex;
+  justify-content: center;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: #1A1A1A;
+}
+
+.rc-container {
+  width: 100%;
+  max-width: 680px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+/* ── 1. Success Header & Animated Tick ─────────────── */
+.rc-success-header {
+  text-align: center;
+  margin-bottom: 28px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.rc-tick-wrapper {
+  margin-bottom: 16px;
+}
+
+.rc-tick-circle {
+  width: 68px;
+  height: 68px;
+  border-radius: 50%;
+  background: #6B9E72;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 28px rgba(107, 158, 114, 0.4), 0 0 0 8px rgba(107, 158, 114, 0.15);
+}
+
+.rc-tick-svg {
+  width: 48px;
+  height: 48px;
+}
+
+.rc-success-title {
+  font-family: 'Archivo Black', 'Inter', sans-serif;
+  font-size: clamp(1.8rem, 4vw, 2.4rem);
+  font-weight: 900;
+  color: #1A1A1A;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.rc-success-sub {
+  font-size: 14.5px;
+  color: rgba(26, 26, 26, 0.65);
+  max-width: 440px;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* ── 2. Digital Bill / Invoice Card ─────────────────── */
+.rc-bill-card {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid rgba(26, 26, 26, 0.1);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.08), 0 2px 8px rgba(0, 0, 0, 0.04);
+  padding: 32px 36px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card Top Row */
+.rc-bill-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 20px;
+  border-bottom: 1px solid rgba(26, 26, 26, 0.08);
+}
+
+.rc-brand-block {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rc-logo-text {
+  font-family: 'Archivo Black', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: 0.04em;
+}
+
+.rc-rx {
+  color: #6B9E72;
+  font-style: italic;
+}
+
+.rc-badge-invoice {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  background: rgba(107, 158, 114, 0.12);
+  color: #2e6035;
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(107, 158, 114, 0.25);
+}
+
+.rc-inv-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.rc-meta-num {
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  font-weight: 700;
+  color: #1A1A1A;
+}
+
+.rc-meta-date {
+  font-size: 11.5px;
+  color: rgba(26, 26, 26, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* PIN Banner */
+.rc-pin-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #1A1A1A;
+  color: #F5F0E8;
+  padding: 14px 20px;
+  border-radius: 14px;
+  margin: 20px 0;
+  box-shadow: 0 4px 16px rgba(26, 26, 26, 0.15);
+}
+
+.rc-pin-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rc-pin-icon {
+  color: #6B9E72;
+  flex-shrink: 0;
+}
+
+.rc-pin-title {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6B9E72;
+}
+
+.rc-pin-desc {
+  font-size: 12px;
+  color: rgba(245, 240, 232, 0.7);
+}
+
+.rc-pin-code {
+  font-family: 'Archivo Black', 'Courier New', monospace;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #F5F0E8;
+  letter-spacing: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px 14px;
+  border-radius: 8px;
+}
+
+/* Parties Grid (Driver + Customer) */
+.rc-parties-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.rc-party-box {
+  background: rgba(26, 26, 26, 0.03);
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.rc-party-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(26, 26, 26, 0.45);
+  margin-bottom: 10px;
+}
+
+/* Driver Profile Box */
+.rc-driver-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rc-driver-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #6B9E72;
+  color: #ffffff;
+  font-size: 18px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.rc-driver-details {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rc-driver-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #1A1A1A;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rc-rating-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #1A1A1A;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 2px 6px;
+  border-radius: 6px;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.rc-driver-vehicle {
+  font-size: 12.5px;
+  color: rgba(26, 26, 26, 0.7);
+}
+
+.rc-plate-pill {
+  font-family: 'Courier New', monospace;
+  font-weight: 700;
+  background: #ffffff;
+  border: 1px solid rgba(26, 26, 26, 0.15);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #1A1A1A;
+}
+
+.rc-driver-phone {
+  font-size: 11.5px;
+  color: #6B9E72;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+/* Customer Box */
+.rc-customer-row {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.rc-cust-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #1A1A1A;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.rc-cust-email {
+  font-size: 11.5px;
+  color: rgba(26, 26, 26, 0.6);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rc-cust-phone {
+  font-size: 11px;
+  color: rgba(26, 26, 26, 0.5);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.rc-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #2e6035;
+  background: rgba(107, 158, 114, 0.12);
+  padding: 2px 8px;
+  border-radius: 20px;
+  margin-top: 4px;
+  width: fit-content;
+}
+
+/* Section Label */
+.rc-section-label {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: rgba(26, 26, 26, 0.45);
+  margin-bottom: 12px;
+}
+
+/* Route Timeline */
+.rc-route-block {
+  margin-bottom: 24px;
+}
+
+.rc-route-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  background: rgba(26, 26, 26, 0.02);
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  border-radius: 14px;
+  padding: 16px;
+}
+
+.rc-route-point {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rc-point-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+.rc-dot-green { background: #6B9E72; box-shadow: 0 0 0 3px rgba(107, 158, 114, 0.2); }
+.rc-dot-red   { background: #e74c3c; box-shadow: 0 0 0 3px rgba(231, 76, 60, 0.2); }
+
+.rc-point-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rc-point-type {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: rgba(26, 26, 26, 0.45);
+}
+
+.rc-point-addr {
+  font-size: 13px;
+  font-weight: 600;
+  color: #1A1A1A;
+  line-height: 1.4;
+}
+
+.rc-route-connector {
+  display: flex;
+  align-items: center;
+  padding: 10px 0 10px 22px;
+  border-left: 2px dashed rgba(26, 26, 26, 0.15);
+  margin-left: 4px;
+}
+
+.rc-distance-tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: #6B9E72;
+  background: #ffffff;
+  border: 1px solid rgba(107, 158, 114, 0.3);
+  padding: 2px 8px;
+  border-radius: 20px;
+}
+
+/* Itemized Fare Breakdown */
+.rc-fare-breakdown {
+  margin-bottom: 24px;
+}
+
+.rc-fare-table {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: rgba(26, 26, 26, 0.02);
+  border: 1px solid rgba(26, 26, 26, 0.08);
+  border-radius: 14px;
+  padding: 16px 20px;
+}
+
+.rc-fare-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: rgba(26, 26, 26, 0.75);
+}
+
+.rc-fare-total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 14px;
+  margin-top: 6px;
+  border-top: 1.5px dashed rgba(26, 26, 26, 0.15);
+}
+
+.rc-total-left {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.rc-total-label {
+  font-size: 14px;
+  font-weight: 800;
+  color: #1A1A1A;
+}
+
+.rc-payment-mode {
+  font-size: 11.5px;
+  color: #6B9E72;
+  font-weight: 600;
+}
+
+.rc-total-amount {
+  font-family: 'Archivo Black', 'Inter', sans-serif;
+  font-size: 1.8rem;
+  font-weight: 900;
+  color: #1A1A1A;
+  letter-spacing: -0.02em;
+}
+
+/* Bill Footer */
+.rc-bill-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 16px;
+  border-top: 1px solid rgba(26, 26, 26, 0.08);
+}
+
+.rc-footer-secure {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: rgba(26, 26, 26, 0.5);
+  font-weight: 500;
+}
+
+.rc-barcode {
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: rgba(26, 26, 26, 0.25);
+  user-select: none;
+}
+
+/* ── 3. Actions Bar ────────────────────────────────── */
+.rc-actions-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-top: 24px;
+  flex-wrap: wrap;
+}
+
+.rc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 13px 22px;
+  border-radius: 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.rc-btn-primary {
+  background: #1A1A1A;
+  color: #F5F0E8;
+  border: none;
+  box-shadow: 0 6px 18px rgba(26, 26, 26, 0.2);
+}
+.rc-btn-primary:hover {
+  background: #333;
+  transform: translateY(-2px);
+  box-shadow: 0 10px 24px rgba(26, 26, 26, 0.3);
+}
+
+.rc-btn-print {
+  background: #6B9E72;
+  color: #ffffff;
+  border: none;
+  box-shadow: 0 6px 18px rgba(107, 158, 114, 0.3);
+}
+.rc-btn-print:hover {
+  background: #5a8760;
+  transform: translateY(-2px);
+}
+
+.rc-btn-outline {
+  background: #ffffff;
+  color: #1A1A1A;
+  border: 1.5px solid rgba(26, 26, 26, 0.15);
+}
+.rc-btn-outline:hover {
+  background: rgba(26, 26, 26, 0.05);
+  border-color: #1A1A1A;
+}
+
+/* ── 4. Print Media Rules ──────────────────────────── */
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+  .rc-page {
+    padding: 0 !important;
+    background: #ffffff !important;
+  }
+  .rc-success-header,
+  .rc-actions-bar {
+    display: none !important;
+  }
+  .rc-bill-card {
+    box-shadow: none !important;
+    border: 1px solid #ddd !important;
+    padding: 20px !important;
+  }
+}
+
+/* ── 5. Responsive Mobile Layout ───────────────────── */
+@media (max-width: 600px) {
+  .rc-page {
+    padding: 32px 14px 60px;
+  }
+  .rc-bill-card {
+    padding: 24px 20px;
+    border-radius: 18px;
+  }
+  .rc-parties-grid {
+    grid-template-columns: 1fr;
+  }
+  .rc-pin-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+  .rc-pin-code {
+    align-self: flex-start;
+  }
+  .rc-actions-bar {
+    flex-direction: column;
+    width: 100%;
+  }
+  .rc-btn {
+    width: 100%;
+  }
+}

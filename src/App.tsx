@@ -1,6 +1,7 @@
 import { Routes, Route, useLocation } from 'react-router-dom'
 import Home from './pages/Home'
 import BookRide from './pages/BookRide'
+import RideReceipt from './pages/RideReceipt'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import DeliverParcel from './pages/DeliverParcel'
@@ -25,6 +26,7 @@ export default function App() {
       <Routes>
         <Route path="/"            element={<Home />} />
         <Route path="/book"        element={<BookRide />} />
+        <Route path="/ride-receipt" element={<RideReceipt />} />
         <Route path="/login"       element={<LoginPage />} />
         <Route path="/register"    element={<RegisterPage />} />
         <Route path="/deliver"     element={<DeliverParcel />} />
