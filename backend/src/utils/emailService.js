@@ -2,12 +2,22 @@ const nodemailer = require('nodemailer')
 
 /**
  * Creates and returns a Nodemailer transporter.
- * Uses custom SMTP credentials if available in .env,
- * otherwise logs the OTP code and creates a test account for zero-config testing.
  */
 function createTransporter() {
-  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS } = process.env
+  const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_SERVICE } = process.env
 
+  // If Gmail service is explicitly specified
+  if (SMTP_SERVICE === 'gmail' && SMTP_USER && SMTP_PASS) {
+    return nodemailer.createTransport({
+      service: 'gmail',
+      auth: {
+        user: SMTP_USER,
+        pass: SMTP_PASS.replace(/\s+/g, ''), // strip spaces from app password
+      },
+    })
+  }
+
+  // If custom SMTP host is specified
   if (SMTP_HOST && SMTP_USER && SMTP_PASS) {
     return nodemailer.createTransport({
       host: SMTP_HOST,
@@ -15,12 +25,14 @@ function createTransporter() {
       secure: SMTP_PORT === '465',
       auth: {
         user: SMTP_USER,
-        pass: SMTP_PASS,
+        pass: SMTP_PASS.replace(/\s+/g, ''),
+      },
+      tls: {
+        rejectUnauthorized: false,
       },
     })
   }
 
-  // Fallback local transporter for zero-config dev
   return null
 }
 
@@ -32,7 +44,7 @@ function createTransporter() {
  * @param {string} [params.name] - Recipient name
  */
 async function sendOtpEmail({ to, otp, name = 'User' }) {
-  const from = process.env.EMAIL_FROM || '"RideXpress Security" <no-reply@ridexpress.com>'
+  const from = process.env.EMAIL_FROM || (process.env.SMTP_USER ? `"RideXpress" <${process.env.SMTP_USER}>` : '"RideXpress Security" <no-reply@ridexpress.com>')
   const subject = `Your RideXpress Verification Code: ${otp}`
 
   const htmlContent = `
@@ -96,19 +108,22 @@ async function sendOtpEmail({ to, otp, name = 'User' }) {
         text: textContent,
         html: htmlContent,
       })
-      console.log(`📧  Email sent to ${to}: Message ID ${info.messageId}`)
+      console.log(`✅  [REAL EMAIL DELIVERED] To: ${to} | MessageID: ${info.messageId}`)
       return { success: true, messageId: info.messageId }
     } catch (err) {
-      console.error(`⚠️  SMTP dispatch failed for ${to}:`, err.message)
+      console.error(`⚠️  [SMTP DELIVERY ERROR for ${to}]:`, err.message)
       console.log(`🔑  [DEV FALLBACK OTP CODE FOR ${to}]: ${otp}`)
-      return { success: true, devMode: true, otp }
+      return { success: true, devMode: true, otp, error: err.message }
     }
   } else {
-    // Zero-config dev mode output
-    console.log(`\n======================================================`)
-    console.log(`📧  [EMAIL DISPATCH] To: ${to}`)
-    console.log(`🔑  [VERIFICATION OTP CODE]: ${otp}  (Valid: 10 mins)`)
-    console.log(`======================================================\n`)
+    // Zero-config dev mode with clear console banner
+    console.log(`\n==================================================================`)
+    console.log(`📧  [EMAIL DISPATCH - DEV SIMULATION]`)
+    console.log(`    To: ${to}`)
+    console.log(`    Subject: ${subject}`)
+    console.log(`    🔑 6-DIGIT OTP CODE: [ ${otp} ] (Valid for 10 mins)`)
+    console.log(`    💡 Note: To send to real Gmail inboxes, add SMTP_USER & SMTP_PASS to backend/.env`)
+    console.log(`==================================================================\n`)
     return { success: true, devMode: true, otp }
   }
 }
