@@ -12,6 +12,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
+import { SocketProvider } from './contexts/SocketContext'
 
 export default function App() {
   const location = useLocation()
@@ -22,28 +23,30 @@ export default function App() {
 
   return (
     <AuthProvider>
-      {!hideNavFooter && <Navbar />}
-      <Routes>
-        <Route path="/"            element={<Home />} />
-        <Route path="/book"        element={<BookRide />} />
-        <Route path="/ride-receipt" element={<RideReceipt />} />
-        <Route path="/login"       element={<LoginPage />} />
-        <Route path="/register"    element={<RegisterPage />} />
-        <Route path="/deliver"     element={<DeliverParcel />} />
-        <Route path="/parcel-form" element={<ParcelForm />} />
-        <Route path="/employee-form" element={<EmployeeForm />} />
+      <SocketProvider>
+        {!hideNavFooter && <Navbar />}
+        <Routes>
+          <Route path="/"            element={<Home />} />
+          <Route path="/book"        element={<BookRide />} />
+          <Route path="/ride-receipt" element={<RideReceipt />} />
+          <Route path="/login"       element={<LoginPage />} />
+          <Route path="/register"    element={<RegisterPage />} />
+          <Route path="/deliver"     element={<DeliverParcel />} />
+          <Route path="/parcel-form" element={<ParcelForm />} />
+          <Route path="/employee-form" element={<EmployeeForm />} />
 
-        {/* Protected: only authenticated employees/admins */}
-        <Route
-          path="/employee-dashboard"
-          element={
-            <ProtectedRoute allowedRoles={['employee', 'admin']}>
-              <EmployeeDashboard />
-            </ProtectedRoute>
-          }
-        />
-      </Routes>
-      {!hideNavFooter && <Footer />}
+          {/* Protected: only authenticated employees/admins */}
+          <Route
+            path="/employee-dashboard"
+            element={
+              <ProtectedRoute allowedRoles={['employee', 'admin']}>
+                <EmployeeDashboard />
+              </ProtectedRoute>
+            }
+          />
+        </Routes>
+        {!hideNavFooter && <Footer />}
+      </SocketProvider>
     </AuthProvider>
   )
 }
