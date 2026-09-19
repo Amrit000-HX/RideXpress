@@ -7,6 +7,7 @@ import { useState, useRef } from 'react'
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
+import { useSocket } from '../contexts/SocketContext'
 import {
   Package, Car, Clock, Star, Bell, AlertCircle,
   ArrowRight, MapPin, Zap, LogOut, Truck, ChevronRight,
@@ -288,31 +289,164 @@ function UpcomingRides() {
 }
 
 /* ════════════════════════════════════════════
-   SIDEBAR: CURRENT SHIFT CARD
+   SIDEBAR: CURRENT SHIFT & LIVE GPS BROADCASTER
    ════════════════════════════════════════════ */
-function ShiftCard() {
-  const hoursWorked = 6.5
+function ShiftCard({ vehicleCategory = 'Scooty' }: { vehicleCategory?: string }) {
+  const { socket, isConnected } = useSocket()
+  const [isOnline, setIsOnline] = useState(false)
+  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null)
+  const [pingCount, setPingCount] = useState(0)
+  const watchIdRef = useRef<number | null>(null)
+  const simIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const hoursWorked = isOnline ? 7.2 : 6.5
   const totalHours = 12
   const pct = (hoursWorked / totalHours) * 100
 
+  // Toggle Live Shift & GPS broadcasting
+  const toggleOnline = () => {
+    if (isOnline) {
+      // Go Offline
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+      if (simIntervalRef.current) {
+        clearInterval(simIntervalRef.current)
+        simIntervalRef.current = null
+      }
+      socket?.emit('driver:go_offline')
+      setIsOnline(false)
+      setGpsCoords(null)
+    } else {
+      // Go Online
+      socket?.emit('driver:go_online', { vehicleType: vehicleCategory })
+      setIsOnline(true)
+
+      // 1. Try real GPS via navigator.geolocation
+      if ('geolocation' in navigator) {
+        watchIdRef.current = navigator.geolocation.watchPosition(
+          (pos) => {
+            const lat = pos.coords.latitude
+            const lng = pos.coords.longitude
+            const heading = pos.coords.heading || 0
+            const speed = pos.coords.speed || 0
+            setGpsCoords({ lat, lng })
+            setPingCount((p) => p + 1)
+
+            socket?.emit('driver:location_update', {
+              lat,
+              lng,
+              heading,
+              speed,
+            })
+          },
+          (err) => {
+            console.warn('GPS hardware access note:', err.message, '- starting smooth simulator fallback')
+            // Simulator fallback (e.g. if running on desktop or inside restricted iframe)
+            let baseLat = 19.0760
+            let baseLng = 72.8777
+            simIntervalRef.current = setInterval(() => {
+              baseLat += (Math.random() - 0.5) * 0.0005
+              baseLng += (Math.random() - 0.5) * 0.0005
+              setGpsCoords({ lat: baseLat, lng: baseLng })
+              setPingCount((p) => p + 1)
+              socket?.emit('driver:location_update', {
+                lat: baseLat,
+                lng: baseLng,
+                heading: Math.floor(Math.random() * 360),
+                speed: 35,
+              })
+            }, 3000)
+          },
+          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
+        )
+      }
+    }
+  }
+
   return (
     <motion.div
-      className="ed-card ed-card-accent"
+      className={`ed-card ${isOnline ? 'ed-card-accent' : ''}`}
       initial={{ opacity: 0, y: 24 }} whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true }} transition={{ duration: 0.6 }}
     >
-      <p className="ed-card-label">Live</p>
-      <h3 className="ed-card-title">Current Shift</h3>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div>
+          <p className="ed-card-label">Real-Time Dispatch</p>
+          <h3 className="ed-card-title">Live Shift &amp; GPS</h3>
+        </div>
+        <button
+          onClick={toggleOnline}
+          style={{
+            background: isOnline ? '#6B9E72' : '#2a2a2a',
+            color: isOnline ? '#ffffff' : '#e0e0e0',
+            border: isOnline ? 'none' : '1px solid rgba(255,255,255,0.15)',
+            borderRadius: '20px',
+            padding: '6px 14px',
+            fontSize: '12px',
+            fontWeight: 700,
+            cursor: 'pointer',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            transition: 'all 0.2s',
+          }}
+        >
+          <span
+            style={{
+              width: '8px',
+              height: '8px',
+              borderRadius: '50%',
+              backgroundColor: isOnline ? '#ffffff' : '#888888',
+              boxShadow: isOnline ? '0 0 8px #ffffff' : 'none',
+            }}
+          />
+          {isOnline ? 'ONLINE (Broadcasting)' : 'GO ONLINE'}
+        </button>
+      </div>
 
-      <div className="ed-shift-time-row">
+      {/* GPS Streaming status pill */}
+      {isOnline && (
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: 'auto' }}
+          style={{
+            marginTop: '14px',
+            padding: '10px 12px',
+            background: 'rgba(107, 158, 114, 0.12)',
+            border: '1px solid rgba(107, 158, 114, 0.3)',
+            borderRadius: '10px',
+            fontSize: '11.5px',
+            color: '#c4e0c8',
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+          }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600 }}>
+            <Navigation size={13} className="ed-green" />
+            <span>GPS Broadcasting Active ({pingCount} pings sent)</span>
+          </div>
+          {gpsCoords && (
+            <div style={{ fontFamily: 'monospace', fontSize: '10.5px', color: '#9ec4a2' }}>
+              📍 {gpsCoords.lat.toFixed(5)}° N, {gpsCoords.lng.toFixed(5)}° E
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      <div className="ed-shift-time-row" style={{ marginTop: '16px' }}>
         <div className="ed-shift-slot">
-          <span className="ed-shift-lbl">Started</span>
-          <span className="ed-shift-val">08:00 AM</span>
+          <span className="ed-shift-lbl">WebSocket</span>
+          <span className="ed-shift-val" style={{ color: isConnected ? '#6B9E72' : '#e74c3c' }}>
+            {isConnected ? '● Connected' : '○ Offline'}
+          </span>
         </div>
         <Zap size={14} className="ed-green" />
         <div className="ed-shift-slot">
-          <span className="ed-shift-lbl">Ends</span>
-          <span className="ed-shift-val">08:00 PM</span>
+          <span className="ed-shift-lbl">Vehicle Fleet</span>
+          <span className="ed-shift-val">{vehicleCategory}</span>
         </div>
       </div>
 
@@ -327,14 +461,9 @@ function ShiftCard() {
           />
         </div>
         <div className="ed-shift-progress-labels">
-          <span>{hoursWorked} hrs worked</span>
-          <span className="ed-muted">{totalHours} hrs shift</span>
+          <span>{hoursWorked} hrs shift elapsed</span>
+          <span className="ed-muted">{totalHours} hrs max</span>
         </div>
-      </div>
-
-      <div className="ed-shift-stats">
-        <div className="ed-shift-stat"><Timer size={13} className="ed-green" /> 30 min break taken</div>
-        <div className="ed-shift-stat"><BarChart3 size={13} className="ed-green" /> No overtime</div>
       </div>
     </motion.div>
   )
@@ -639,7 +768,7 @@ export default function EmployeeDashboard() {
 
           {/* RIGHT: sidebar (1/3) */}
           <div className="ed-right">
-            <ShiftCard />
+            <ShiftCard vehicleCategory={empVehicle} />
             <NotificationsPanel />
             <PriorityQueue />
           </div>

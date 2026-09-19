@@ -13,6 +13,7 @@ import {
   Locate, Search, X, Navigation2, Loader,
   ArrowLeft, Navigation, Shield,
 } from 'lucide-react'
+import { useLiveDriverTracking } from '../../hooks/useLiveDriverTracking'
 import './MapPicker.css'
 
 /* ─── Fix default Leaflet marker icon (broken by Vite bundler) ── */
@@ -47,6 +48,25 @@ const pin = (color: string, label: string) =>
 
 const pickupPin = pin('#6B9E72', 'PICKUP')  // sage green
 const dropPin   = pin('#e74c3c', 'DROP')    // red
+
+/* Live vehicle GPS marker icon with heading rotation */
+const vehiclePin = (vehicleType: string = 'Car', heading: number = 0) =>
+  L.divIcon({
+    className: '',
+    html: `
+      <div style="transform: translate(-50%, -50%) rotate(${heading}deg); transition: transform 0.35s ease-out; display: flex; align-items: center; justify-content: center;">
+        <div style="width: 38px; height: 38px; background: #1A1A1A; border: 2.5px solid #6B9E72; border-radius: 50%; box-shadow: 0 4px 14px rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; color: #F5F0E8;" title="${vehicleType}">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#F5F0E8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.5 2.8C2.1 10.8 2 11 2 11.3V16c0 .6.4 1 1 1h2"/>
+            <circle cx="7" cy="17" r="2"/>
+            <circle cx="17" cy="17" r="2"/>
+          </svg>
+        </div>
+      </div>
+    `,
+    iconSize:   [38, 38],
+    iconAnchor: [19, 19],
+  })
 
 /* ─── Types ───────────────────────────────────────────────────── */
 export interface LatLng       { lat: number; lng: number }
@@ -184,6 +204,9 @@ export default function MapPicker({
   const [showSuggest, setShowSuggest] = useState(false)
   const [distance,    setDistance]    = useState<number | null>(null)
   const [fare,        setFare]        = useState<number | null>(null)
+
+  // Real-time driver GPS tracking & nearby fleet hook
+  const { nearbyDrivers } = useLiveDriverTracking()
 
   const searchRef   = useRef<HTMLDivElement>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -358,6 +381,15 @@ export default function MapPicker({
             />
           )}
 
+          {/* Live nearby online fleet driver markers */}
+          {nearbyDrivers.map((d) => (
+            <Marker
+              key={d.id}
+              position={[d.lat, d.lng]}
+              icon={vehiclePin(d.vehicleType || vehicleType, d.heading || 0)}
+            />
+          ))}
+
           {/* Dotted route line */}
           {polyLine.length === 2 && (
             <Polyline
@@ -382,6 +414,34 @@ export default function MapPicker({
           <span className="mp-vehicle-sep">·</span>
           <span className="mp-vehicle-rate">₹{vehiclePrice.toLocaleString('en-IN')}{vehiclePriceUnit}</span>
           <span className="mp-vehicle-eta">({vehicleEta})</span>
+        </div>
+
+        {/* Live Active Fleet Indicator */}
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '6px',
+            background: 'rgba(107, 158, 114, 0.12)',
+            border: '1px solid rgba(107, 158, 114, 0.35)',
+            color: '#2e6035',
+            borderRadius: '20px',
+            padding: '5px 12px',
+            fontSize: '11.5px',
+            fontWeight: 700,
+            whiteSpace: 'nowrap',
+          }}
+        >
+          <span
+            style={{
+              width: '7px',
+              height: '7px',
+              borderRadius: '50%',
+              backgroundColor: '#6B9E72',
+              boxShadow: '0 0 6px #6B9E72',
+            }}
+          />
+          <span>{nearbyDrivers.length > 0 ? `${nearbyDrivers.length} Live Drivers Nearby` : 'Fleet Online'}</span>
         </div>
 
         {/* Search Drop Destination */}

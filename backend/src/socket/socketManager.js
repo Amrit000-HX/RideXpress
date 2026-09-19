@@ -159,6 +159,68 @@ module.exports = function mountSocketManager(io) {
       console.log(`🔴 [Driver Offline] driverId: ${userId}`)
     })
 
+    // ── Driver: Location Update (GPS Streaming) ─────────────────────────
+    // Payload: { lat, lng, heading, speed, activeRideId }
+    socket.on('driver:location_update', (data) => {
+      if (role !== 'employee') return
+      const { lat, lng, heading, speed, activeRideId } = data || {}
+      if (lat == null || lng == null) return
+
+      const entry = connectedDrivers.get(userId) || {}
+      connectedDrivers.set(userId, {
+        ...entry,
+        socketId: socket.id,
+        lat: Number(lat),
+        lng: Number(lng),
+        heading: Number(heading) || 0,
+        speed: Number(speed) || 0,
+        isOnline: true,
+        lastPing: Date.now(),
+      })
+
+      // 1. If assigned to an active ride, forward GPS directly to customer's ride room
+      if (activeRideId) {
+        io.to(`ride:${activeRideId}`).emit('driver:position', {
+          driverId: userId,
+          lat: Number(lat),
+          lng: Number(lng),
+          heading: Number(heading) || 0,
+          speed: Number(speed) || 0,
+          timestamp: Date.now(),
+        })
+      }
+
+      // 2. Broadcast available driver positions for real-time fleet map view
+      io.emit('fleet:driver_location', {
+        driverId: userId,
+        vehicleType: entry.vehicleType,
+        lat: Number(lat),
+        lng: Number(lng),
+        heading: Number(heading) || 0,
+        isAvailable: entry.isAvailable,
+      })
+    })
+
+    // ── Fleet: Request Active Nearby Drivers ─────────────────────────────
+    socket.on('fleet:get_nearby', () => {
+      const now = Date.now()
+      const activeList = []
+      for (const [id, d] of connectedDrivers.entries()) {
+        // Consider driver active if pinged in last 30 seconds
+        if (d.isOnline && d.lat != null && d.lng != null && (now - (d.lastPing || 0) < 30000)) {
+          activeList.push({
+            id,
+            vehicleType: d.vehicleType,
+            lat: d.lat,
+            lng: d.lng,
+            heading: d.heading || 0,
+            isAvailable: d.isAvailable,
+          })
+        }
+      }
+      socket.emit('fleet:nearby_drivers', { drivers: activeList })
+    })
+
     // ── Join a Ride Room (used by both customer and driver) ──────────────
     // Called by Phase 3 after a ride is accepted.
     // Payload: { rideId: string }
