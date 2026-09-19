@@ -13,6 +13,7 @@ import {
   ChevronDown,
 } from 'lucide-react'
 import MapPicker, { type LocationData } from '../components/MapPicker/MapPicker'
+import { createRideBooking } from '../services/rideService'
 import './BookRide.css'
 
 import imgScooty from '../assets/veh_scooty.png'
@@ -360,34 +361,87 @@ export default function BookRide() {
     }
   }, [scrollYProgress])
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!selected) return
 
-    const rideData = {
-      bookingId: `RX-RIDE-${Math.floor(100000 + Math.random() * 900000)}`,
-      customerName: user?.name || 'Customer',
-      customerEmail: user?.email || 'customer@ridexpress.com',
-      customerPhone: user?.phone || '+91 98765 43210',
-      pickupAddress: pickupLoc?.address || 'Current Location (GPS), Main Road',
-      dropAddress: dropLoc?.address || 'Selected Destination, Sector 5',
-      vehicleType: selected.type,
-      vehicleImage: selected.img,
-      distanceKm: distanceKm || 5.8,
-      totalFare: fare || (selected.price * 5),
-      driverName: 'Arjun Mehta',
-      driverPhone: '+91 98451 23098',
-      driverVehicleNumber: 'MH 02 EQ 8492',
-      driverRating: 4.94,
-      startRidePin: Math.floor(1000 + Math.random() * 9000).toString(),
-      paymentMethod: 'Cash on Delivery / UPI',
-      bookedAt: new Date().toLocaleString('en-IN', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }),
-    }
+    const pickupLat = pickupLoc?.latLng.lat || 19.0760
+    const pickupLng = pickupLoc?.latLng.lng || 72.8777
+    const dropLat   = dropLoc?.latLng.lat   || 19.1136
+    const dropLng   = dropLoc?.latLng.lng   || 72.8697
+    const dist      = distanceKm || 5.8
+    const estimatedFare = fare || (selected.price * 5)
 
-    setSelected(null)
-    navigate('/ride-receipt', { state: rideData })
+    try {
+      const res = await createRideBooking({
+        vehicleType: selected.type,
+        vehicleId: selected.id,
+        pickup: {
+          address: pickupLoc?.address || 'Current Location (GPS), Main Road',
+          lat: pickupLat,
+          lng: pickupLng,
+        },
+        drop: {
+          address: dropLoc?.address || 'Selected Destination, Sector 5',
+          lat: dropLat,
+          lng: dropLng,
+        },
+        distanceKm: dist,
+        estimatedFare,
+      })
+
+      const ride = res.ride
+      const rideData = {
+        bookingId: ride.bookingId,
+        customerName: user?.name || 'Customer',
+        customerEmail: user?.email || 'customer@ridexpress.com',
+        customerPhone: user?.phone || '+91 98765 43210',
+        pickupAddress: ride.pickup.address,
+        dropAddress: ride.drop.address,
+        vehicleType: ride.vehicleType,
+        vehicleImage: selected.img,
+        distanceKm: ride.distanceKm,
+        totalFare: ride.estimatedFare,
+        driverName: ride.driver.name,
+        driverPhone: ride.driver.phone,
+        driverVehicleNumber: ride.driver.vehicleNumber,
+        driverRating: ride.driver.rating,
+        startRidePin: ride.startRidePin,
+        paymentMethod: 'Cash on Delivery / UPI',
+        bookedAt: new Date(ride.bookedAt).toLocaleString('en-IN', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
+      }
+
+      setSelected(null)
+      navigate('/ride-receipt', { state: rideData })
+    } catch (err) {
+      console.warn('Real-time matching note (using fallback):', err)
+      const fallbackData = {
+        bookingId: `RX-RIDE-${Math.floor(100000 + Math.random() * 900000)}`,
+        customerName: user?.name || 'Customer',
+        customerEmail: user?.email || 'customer@ridexpress.com',
+        customerPhone: user?.phone || '+91 98765 43210',
+        pickupAddress: pickupLoc?.address || 'Current Location (GPS), Main Road',
+        dropAddress: dropLoc?.address || 'Selected Destination, Sector 5',
+        vehicleType: selected.type,
+        vehicleImage: selected.img,
+        distanceKm: dist,
+        totalFare: estimatedFare,
+        driverName: 'Arjun Mehta',
+        driverPhone: '+91 98451 23098',
+        driverVehicleNumber: 'MH 02 EQ 8492',
+        driverRating: 4.94,
+        startRidePin: Math.floor(1000 + Math.random() * 9000).toString(),
+        paymentMethod: 'Cash on Delivery / UPI',
+        bookedAt: new Date().toLocaleString('en-IN', {
+          dateStyle: 'medium',
+          timeStyle: 'short',
+        }),
+      }
+      setSelected(null)
+      navigate('/ride-receipt', { state: fallbackData })
+    }
   }
 
   if (!isAuthenticated) return null

@@ -3,7 +3,7 @@
  * Cinematic Noir aesthetic × RideXpress Cream/Green/Charcoal palette.
  * Dark surfaces · Cream text · Green accents · Grain overlay · Heavy type
  */
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { motion, useScroll, useTransform, AnimatePresence } from 'framer-motion'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
@@ -13,7 +13,9 @@ import {
   ArrowRight, MapPin, Zap, LogOut, Truck, ChevronRight,
   BarChart3, Navigation, Timer, CalendarDays,
   CircleDot, ArrowUpRight, Wallet, BadgeAlert,
+  CheckCircle2, X, Phone, User, Check, KeyRound,
 } from 'lucide-react'
+import { acceptRideBooking, completeRideBooking } from '../services/rideService'
 import './EmployeeDashboard.css'
 
 /* ════════════════════════════════════════════
@@ -633,6 +635,64 @@ export default function EmployeeDashboard() {
   const bgScale     = useTransform(scrollYProgress, [0, 1],   [1, 1.18])
   const heroOpacity = useTransform(scrollYProgress, [0, 0.7], [1, 0])
 
+  const { socket, isConnected } = useSocket()
+  const [incomingRequest, setIncomingRequest] = useState<any | null>(null)
+  const [activeTrip, setActiveTrip]           = useState<any | null>(null)
+  const [acceptTimer, setAcceptTimer]         = useState<number>(30)
+
+  // Listen for real-time ride matching requests from customers
+  useEffect(() => {
+    if (!socket || !isConnected) return
+
+    const handleIncomingRequest = (data: any) => {
+      setIncomingRequest(data)
+      setAcceptTimer(30)
+    }
+
+    socket.on('ride:incoming_request', handleIncomingRequest)
+
+    return () => {
+      socket.off('ride:incoming_request', handleIncomingRequest)
+    }
+  }, [socket, isConnected])
+
+  // 30-Second Countdown timer for incoming request
+  useEffect(() => {
+    if (!incomingRequest) return
+    const interval = setInterval(() => {
+      setAcceptTimer((t) => {
+        if (t <= 1) {
+          setIncomingRequest(null)
+          return 30
+        }
+        return t - 1
+      })
+    }, 1000)
+    return () => clearInterval(interval)
+  }, [incomingRequest])
+
+  const handleAcceptRide = async () => {
+    if (!incomingRequest) return
+    try {
+      await acceptRideBooking(incomingRequest.rideId)
+      setActiveTrip(incomingRequest)
+      setIncomingRequest(null)
+      socket?.emit('ride:join_room', { rideId: incomingRequest.rideId })
+    } catch (err) {
+      console.error('Failed to accept ride:', err)
+    }
+  }
+
+  const handleCompleteRide = async () => {
+    if (!activeTrip) return
+    try {
+      await completeRideBooking(activeTrip.rideId)
+      setActiveTrip(null)
+    } catch (err) {
+      console.error('Failed to complete ride:', err)
+    }
+  }
+
   const handleLogout = () => {
     logout()
     navigate('/login')
@@ -645,6 +705,136 @@ export default function EmployeeDashboard() {
     <div className="ed-page">
       {/* ── Grain Overlay ── */}
       <div className="ed-grain" aria-hidden="true" />
+
+      {/* ══════════════════════════════════════════════
+          LIVE INCOMING RIDE REQUEST POPUP (Phase 3 Matching)
+         ══════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {incomingRequest && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            style={{
+              position: 'fixed',
+              inset: 0,
+              zIndex: 9999,
+              backgroundColor: 'rgba(0,0,0,0.85)',
+              backdropFilter: 'blur(8px)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '20px',
+            }}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              style={{
+                width: '100%',
+                maxWidth: '460px',
+                background: '#1A1A1A',
+                border: '2px solid #6B9E72',
+                borderRadius: '24px',
+                padding: '28px',
+                boxShadow: '0 20px 60px rgba(107, 158, 114, 0.35)',
+                color: '#F5F0E8',
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#6B9E72', boxShadow: '0 0 10px #6B9E72' }} />
+                  <span style={{ fontSize: '12px', fontWeight: 800, letterSpacing: '1px', textTransform: 'uppercase', color: '#6B9E72' }}>
+                    New Match Request
+                  </span>
+                </div>
+                <div style={{ background: 'rgba(255,255,255,0.1)', padding: '4px 10px', borderRadius: '12px', fontSize: '13px', fontWeight: 700 }}>
+                  ⏱️ {acceptTimer}s left
+                </div>
+              </div>
+
+              {/* Progress bar */}
+              <div style={{ width: '100%', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden', marginBottom: '20px' }}>
+                <div style={{ width: `${(acceptTimer / 30) * 100}%`, height: '100%', background: '#6B9E72', transition: 'width 1s linear' }} />
+              </div>
+
+              {/* Passenger & Fare Block */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px', padding: '16px', background: 'rgba(255,255,255,0.05)', borderRadius: '16px' }}>
+                <div>
+                  <div style={{ fontSize: '18px', fontWeight: 800 }}>{incomingRequest.customerName}</div>
+                  <div style={{ fontSize: '12px', color: 'rgba(245,240,232,0.6)' }}>{incomingRequest.vehicleType} · {incomingRequest.distanceKm} km trip</div>
+                </div>
+                <div style={{ fontSize: '26px', fontWeight: 900, color: '#6B9E72' }}>
+                  ₹{incomingRequest.estimatedFare}
+                </div>
+              </div>
+
+              {/* Route */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '24px', paddingLeft: '8px' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#6B9E72', marginTop: '5px' }} />
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#6B9E72', fontWeight: 700 }}>PICKUP POINT</div>
+                    <div>{incomingRequest.pickup?.address}</div>
+                  </div>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', fontSize: '13px' }}>
+                  <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#e74c3c', marginTop: '5px' }} />
+                  <div>
+                    <div style={{ fontSize: '11px', color: '#e74c3c', fontWeight: 700 }}>DESTINATION</div>
+                    <div>{incomingRequest.drop?.address}</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
+                <button
+                  onClick={() => setIncomingRequest(null)}
+                  style={{ padding: '14px', background: 'rgba(255,255,255,0.08)', color: '#F5F0E8', border: 'none', borderRadius: '14px', fontWeight: 700, cursor: 'pointer' }}
+                >
+                  Decline
+                </button>
+                <button
+                  onClick={handleAcceptRide}
+                  style={{ padding: '14px', background: '#6B9E72', color: '#ffffff', border: 'none', borderRadius: '14px', fontWeight: 800, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(107, 158, 114, 0.4)' }}
+                >
+                  <Check size={18} strokeWidth={3} /> ACCEPT RIDE
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ══════════════════════════════════════════════
+          ACTIVE TRIP IN PROGRESS BANNER (Phase 3)
+         ══════════════════════════════════════════════ */}
+      {activeTrip && (
+        <div style={{ background: '#1A1A1A', borderBottom: '2px solid #6B9E72', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#6B9E72', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
+              <Navigation size={18} />
+            </div>
+            <div>
+              <div style={{ fontSize: '14px', fontWeight: 800, color: '#F5F0E8' }}>
+                Active Trip in Progress — {activeTrip.customerName} (₹{activeTrip.estimatedFare})
+              </div>
+              <div style={{ fontSize: '12px', color: '#6B9E72' }}>
+                📍 To: {activeTrip.drop?.address?.slice(0, 45)}… · Start PIN: {activeTrip.startRidePin}
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleCompleteRide}
+            style={{ background: '#6B9E72', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: 800, fontSize: '13px', cursor: 'pointer' }}
+          >
+            Complete Trip ✓
+          </button>
+        </div>
+      )}
 
       {/* ══════════════════════════════════════════════
           HERO — cinematic profile section
