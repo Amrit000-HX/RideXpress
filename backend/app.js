@@ -6,6 +6,7 @@ const authRoutes     = require('./src/routes/authRoutes')
 const userRoutes     = require('./src/routes/userRoutes')
 const employeeRoutes = require('./src/routes/employeeRoutes')
 const rideRoutes     = require('./src/routes/rideRoutes')
+const chatRoutes     = require('./src/routes/chatRoutes')
 
 const app = express()
 
@@ -45,6 +46,7 @@ app.use('/api/auth',      authRoutes)
 app.use('/api/users',     userRoutes)
 app.use('/api/employees', employeeRoutes)
 app.use('/api/rides',     rideRoutes)
+app.use('/api/chat',      chatRoutes)
 
 // ── Health check ─────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {

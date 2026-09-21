@@ -243,6 +243,57 @@ module.exports = function mountSocketManager(io) {
       socket.emit('pong', { timestamp: Date.now() })
     })
 
+    // ── Chat: Send Message (Phase 5) ─────────────────────────────────────
+    // Payload: { rideId, message, senderName }
+    socket.on('chat:send', async (data) => {
+      const { rideId, message, senderName } = data || {}
+      if (!rideId || !message?.trim()) return
+
+      try {
+        const ChatMessage = require('../models/ChatMessage')
+        const saved = await ChatMessage.create({
+          rideId,
+          senderId:   userId,
+          senderName: senderName || socket.data.name || 'User',
+          senderRole: role === 'employee' ? 'driver' : 'customer',
+          message:    message.trim(),
+        })
+
+        // Broadcast to everyone in the ride room (both customer + driver)
+        io.to(`ride:${rideId}`).emit('chat:message', {
+          id:         saved._id,
+          rideId:     saved.rideId,
+          senderId:   saved.senderId,
+          senderName: saved.senderName,
+          senderRole: saved.senderRole,
+          message:    saved.message,
+          createdAt:  saved.createdAt,
+        })
+
+        console.log(`💬 [Chat] ${role} → ride:${rideId}: "${message.trim().slice(0, 40)}"`)
+      } catch (err) {
+        console.error('[chat:send error]', err.message)
+        socket.emit('chat:error', { message: 'Failed to send message.' })
+      }
+    })
+
+    // ── Notifications: Push a notification to a specific user ────────────
+    // Called internally by server-side logic; also usable via socket for admin
+    socket.on('notification:send', ({ targetUserId, title, body, type }) => {
+      if (role !== 'admin') return // Only admin can push custom notifications
+      const targetSocket = connectedUsers.get(String(targetUserId))
+      if (targetSocket) {
+        io.to(targetSocket).emit('notification:new', {
+          id: Date.now(),
+          title,
+          body,
+          type: type || 'info',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
+    })
+
     // ── Disconnect Handler ───────────────────────────────────────────────
     socket.on('disconnect', (reason) => {
       console.log(`❌ [Socket] Disconnected | ${role.padEnd(8)} | userId: ${userId} | reason: ${reason}`)

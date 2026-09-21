@@ -88,6 +88,16 @@ exports.createRide = async (req, res) => {
       if (entry) {
         connectedDrivers.set(matchedDriver.driverId, { ...entry, isAvailable: false })
       }
+
+      // Notify customer that their driver has been matched
+      io.emitToUser(String(req.user.id), 'notification:new', {
+        id: Date.now(),
+        title: '🚗 Driver Matched!',
+        body: `${matchedDriver.name} is on the way. ETA: ${matchedDriver.etaMinutes} min · PIN: ${startRidePin}`,
+        type: 'success',
+        timestamp: new Date().toISOString(),
+        read: false,
+      })
     }
 
     return res.status(201).json({

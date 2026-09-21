@@ -13,9 +13,10 @@ import {
   ArrowRight, MapPin, Zap, LogOut, Truck, ChevronRight,
   BarChart3, Navigation, Timer, CalendarDays,
   CircleDot, ArrowUpRight, Wallet, BadgeAlert,
-  CheckCircle2, X, Phone, User, Check, KeyRound,
+  CheckCircle2, X, Phone, User, Check, KeyRound, MessageSquare,
 } from 'lucide-react'
 import { acceptRideBooking, completeRideBooking } from '../services/rideService'
+import ChatBox from '../components/ChatBox'
 import './EmployeeDashboard.css'
 
 /* ════════════════════════════════════════════
@@ -639,6 +640,7 @@ export default function EmployeeDashboard() {
   const [incomingRequest, setIncomingRequest] = useState<any | null>(null)
   const [activeTrip, setActiveTrip]           = useState<any | null>(null)
   const [acceptTimer, setAcceptTimer]         = useState<number>(30)
+  const [showDriverChat, setShowDriverChat]   = useState(false)
 
   // Listen for real-time ride matching requests from customers
   useEffect(() => {
@@ -827,14 +829,49 @@ export default function EmployeeDashboard() {
               </div>
             </div>
           </div>
-          <button
-            onClick={handleCompleteRide}
-            style={{ background: '#6B9E72', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: 800, fontSize: '13px', cursor: 'pointer' }}
-          >
-            Complete Trip ✓
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <button
+              onClick={() => setShowDriverChat((prev) => !prev)}
+              style={{
+                background: showDriverChat ? '#6B9E72' : 'rgba(255, 255, 255, 0.08)',
+                border: '1px solid rgba(107, 158, 114, 0.4)',
+                color: '#F5F0E8',
+                borderRadius: '12px',
+                padding: '10px 16px',
+                fontWeight: 700,
+                fontSize: '13px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+              }}
+            >
+              <MessageSquare size={15} />
+              <span>{showDriverChat ? 'Close Chat' : 'Chat with Passenger'}</span>
+            </button>
+            <button
+              onClick={handleCompleteRide}
+              style={{ background: '#6B9E72', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: 800, fontSize: '13px', cursor: 'pointer' }}
+            >
+              Complete Trip ✓
+            </button>
+          </div>
         </div>
       )}
+
+      {/* Driver In-App Chat Modal */}
+      <AnimatePresence>
+        {showDriverChat && activeTrip && (
+          <ChatBox
+            rideId={activeTrip.rideId}
+            currentUserId={user?.id || 'driver-1'}
+            currentUserName={empName}
+            currentUserRole="driver"
+            partnerName={activeTrip.customerName}
+            onClose={() => setShowDriverChat(false)}
+          />
+        )}
+      </AnimatePresence>
 
       {/* ══════════════════════════════════════════════
           HERO — cinematic profile section

@@ -8,14 +8,15 @@
  * - RideXpress Noir & Sage palette: Cream #F5F0E8 · Sage #6B9E72 · Charcoal #1A1A1A
  * - Print / PDF invoice export support.
  */
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation, useNavigate, Link } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import {
   Printer, ArrowRight, Home, Phone, Star,
-  Shield, Check, Calendar, KeyRound, User,
+  Shield, Check, Calendar, KeyRound, User, MessageSquare,
 } from 'lucide-react'
+import ChatBox from '../components/ChatBox'
 import './RideReceipt.css'
 
 import imgScooty from '../assets/veh_scooty.png'
@@ -25,6 +26,7 @@ import imgJeep   from '../assets/veh_jeep.png'
 import imgSuv    from '../assets/veh_suv.png'
 
 export interface RideReceiptData {
+  rideId?:            string
   bookingId:          string
   customerName:       string
   customerEmail:      string
@@ -52,6 +54,7 @@ export default function RideReceipt() {
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const [showChat, setShowChat] = useState(false)
 
   useEffect(() => {
     window.scrollTo(0, 0)
@@ -72,6 +75,7 @@ export default function RideReceipt() {
   const calculatedTotal = baseFare + distanceFare + serviceFee + taxAmount
 
   const receipt: RideReceiptData = {
+    rideId:             stateData?.rideId             || '65f000000000000000000001',
     bookingId:          stateData?.bookingId          || `RX-RIDE-${Math.floor(100000 + Math.random() * 900000)}`,
     customerName:       stateData?.customerName       || user?.name || 'Customer',
     customerEmail:      stateData?.customerEmail      || user?.email || 'customer@ridexpress.com',
@@ -222,8 +226,28 @@ export default function RideReceipt() {
                   <div className="rc-driver-vehicle">
                     <strong>{receipt.vehicleType}</strong> · <span className="rc-plate-pill">{receipt.driverVehicleNumber}</span>
                   </div>
-                  <div className="rc-driver-phone">
-                    <Phone size={11} /> {receipt.driverPhone}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginTop: '4px' }}>
+                    <div className="rc-driver-phone">
+                      <Phone size={11} /> {receipt.driverPhone}
+                    </div>
+                    <button
+                      onClick={() => setShowChat(true)}
+                      style={{
+                        background: 'rgba(107, 158, 114, 0.18)',
+                        border: '1px solid #6B9E72',
+                        color: '#6B9E72',
+                        borderRadius: '6px',
+                        padding: '3px 8px',
+                        fontSize: '11px',
+                        fontWeight: 700,
+                        cursor: 'pointer',
+                        display: 'inline-flex',
+                        alignItems: 'center',
+                        gap: '4px',
+                      }}
+                    >
+                      <MessageSquare size={11} /> Chat
+                    </button>
                   </div>
                 </div>
               </div>
@@ -337,6 +361,51 @@ export default function RideReceipt() {
             <Home size={15} /> Back to Home
           </Link>
         </motion.div>
+
+        {/* ── 4. CHAT WITH DRIVER FLOATING BUTTON & MODAL ── */}
+        {!showChat && (
+          <motion.button
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            onClick={() => setShowChat(true)}
+            style={{
+              position: 'fixed',
+              bottom: '28px',
+              right: '28px',
+              zIndex: 9990,
+              background: '#6B9E72',
+              color: '#ffffff',
+              border: 'none',
+              borderRadius: '50px',
+              padding: '12px 22px',
+              fontWeight: 800,
+              fontSize: '13.5px',
+              boxShadow: '0 8px 30px rgba(107, 158, 114, 0.45)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+            }}
+          >
+            <MessageSquare size={18} />
+            <span>Chat with {receipt.driverName.split(' ')[0]}</span>
+          </motion.button>
+        )}
+
+        <AnimatePresence>
+          {showChat && (
+            <ChatBox
+              rideId={receipt.rideId || '65f000000000000000000001'}
+              currentUserId={user?.id || 'customer-1'}
+              currentUserName={receipt.customerName}
+              currentUserRole="customer"
+              partnerName={receipt.driverName}
+              onClose={() => setShowChat(false)}
+            />
+          )}
+        </AnimatePresence>
 
       </div>
     </div>

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { User, LogOut } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
+import NotificationBell from './NotificationBell'
 import './Navbar.css'
 
 const links = [
@@ -56,6 +57,11 @@ export default function Navbar() {
               Book a Ride
             </Link>
           </li>
+          {isAuthenticated && (
+            <li style={{ display: 'flex', alignItems: 'center' }}>
+              <NotificationBell />
+            </li>
+          )}
           <li>
             {isAuthenticated ? (
               <button className="nav-login" onClick={() => { logout(); setMenuOpen(false) }} aria-label="Logout" style={{ background: 'transparent', cursor: 'pointer' }}>

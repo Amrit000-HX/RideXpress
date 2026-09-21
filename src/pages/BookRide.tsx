@@ -391,6 +391,7 @@ export default function BookRide() {
 
       const ride = res.ride
       const rideData = {
+        rideId: ride.id,
         bookingId: ride.bookingId,
         customerName: user?.name || 'Customer',
         customerEmail: user?.email || 'customer@ridexpress.com',
@@ -418,6 +419,7 @@ export default function BookRide() {
     } catch (err) {
       console.warn('Real-time matching note (using fallback):', err)
       const fallbackData = {
+        rideId: '65f000000000000000000001',
         bookingId: `RX-RIDE-${Math.floor(100000 + Math.random() * 900000)}`,
         customerName: user?.name || 'Customer',
         customerEmail: user?.email || 'customer@ridexpress.com',

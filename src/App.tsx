@@ -13,6 +13,13 @@ import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
 import { SocketProvider } from './contexts/SocketContext'
+import { NotificationToast } from './components/NotificationToast'
+import { useNotifications } from './hooks/useNotifications'
+
+function GlobalNotificationToasts() {
+  const { notifications, dismiss } = useNotifications()
+  return <NotificationToast notifications={notifications} onDismiss={dismiss} />
+}
 
 export default function App() {
   const location = useLocation()
@@ -24,6 +31,7 @@ export default function App() {
   return (
     <AuthProvider>
       <SocketProvider>
+        <GlobalNotificationToasts />
         {!hideNavFooter && <Navbar />}
         <Routes>
           <Route path="/"            element={<Home />} />
