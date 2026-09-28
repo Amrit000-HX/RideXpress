@@ -33,7 +33,7 @@ export default function NotificationBell() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          color: '#1A1A1A',
+          color: 'currentColor',
           transition: 'background 0.15s',
         }}
         title="Notifications"

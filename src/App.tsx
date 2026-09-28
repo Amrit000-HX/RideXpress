@@ -13,8 +13,8 @@ import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './contexts/AuthContext'
 import { SocketProvider } from './contexts/SocketContext'
+import { NotificationProvider, useNotifications } from './contexts/NotificationContext'
 import { NotificationToast } from './components/NotificationToast'
-import { useNotifications } from './hooks/useNotifications'
 
 function GlobalNotificationToasts() {
   const { notifications, dismiss } = useNotifications()
@@ -31,29 +31,31 @@ export default function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <GlobalNotificationToasts />
-        {!hideNavFooter && <Navbar />}
-        <Routes>
-          <Route path="/"            element={<Home />} />
-          <Route path="/book"        element={<BookRide />} />
-          <Route path="/ride-receipt" element={<RideReceipt />} />
-          <Route path="/login"       element={<LoginPage />} />
-          <Route path="/register"    element={<RegisterPage />} />
-          <Route path="/deliver"     element={<DeliverParcel />} />
-          <Route path="/parcel-form" element={<ParcelForm />} />
-          <Route path="/employee-form" element={<EmployeeForm />} />
+        <NotificationProvider>
+          <GlobalNotificationToasts />
+          {!hideNavFooter && <Navbar />}
+          <Routes>
+            <Route path="/"            element={<Home />} />
+            <Route path="/book"        element={<BookRide />} />
+            <Route path="/ride-receipt" element={<RideReceipt />} />
+            <Route path="/login"       element={<LoginPage />} />
+            <Route path="/register"    element={<RegisterPage />} />
+            <Route path="/deliver"     element={<DeliverParcel />} />
+            <Route path="/parcel-form" element={<ParcelForm />} />
+            <Route path="/employee-form" element={<EmployeeForm />} />
 
-          {/* Protected: only authenticated employees/admins */}
-          <Route
-            path="/employee-dashboard"
-            element={
-              <ProtectedRoute allowedRoles={['employee', 'admin']}>
-                <EmployeeDashboard />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-        {!hideNavFooter && <Footer />}
+            {/* Protected: only authenticated employees/admins */}
+            <Route
+              path="/employee-dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['employee', 'admin']}>
+                  <EmployeeDashboard />
+                </ProtectedRoute>
+              }
+            />
+          </Routes>
+          {!hideNavFooter && <Footer />}
+        </NotificationProvider>
       </SocketProvider>
     </AuthProvider>
   )

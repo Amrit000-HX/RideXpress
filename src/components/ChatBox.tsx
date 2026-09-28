@@ -68,8 +68,19 @@ export default function ChatBox({
 
     const handleMessage = (msg: ChatMsg) => {
       setMessages((prev) => {
-        // Deduplicate if server echoes our own message
+        // 1. Deduplicate by exact ID
         if (prev.some((m) => m.id === msg.id)) return prev
+
+        // 2. If it is an echo of our own optimistic message, replace it
+        const optIdx = prev.findIndex(
+          (m) => m.id.startsWith('opt-') && m.senderId === msg.senderId && m.message === msg.message
+        )
+        if (optIdx !== -1) {
+          const next = [...prev]
+          next[optIdx] = msg
+          return next
+        }
+
         return [...prev, msg]
       })
     }

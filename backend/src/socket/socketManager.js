@@ -243,7 +243,7 @@ module.exports = function mountSocketManager(io) {
       socket.emit('pong', { timestamp: Date.now() })
     })
 
-    // ── Chat: Send Message (Phase 5) ─────────────────────────────────────
+    // ── Chat: Send Message (Phase 5 Hardened) ───────────────────────────
     // Payload: { rideId, message, senderName }
     socket.on('chat:send', async (data) => {
       const { rideId, message, senderName } = data || {}
@@ -251,26 +251,91 @@ module.exports = function mountSocketManager(io) {
 
       try {
         const ChatMessage = require('../models/ChatMessage')
+        const Ride        = require('../models/Ride')
+        const Parcel      = require('../models/Parcel')
+
+        const senderDisplayName = senderName || socket.data.name || (role === 'employee' ? 'Driver' : 'Passenger')
+        const senderRole = role === 'employee' ? 'driver' : 'customer'
+
         const saved = await ChatMessage.create({
-          rideId,
-          senderId:   userId,
-          senderName: senderName || socket.data.name || 'User',
-          senderRole: role === 'employee' ? 'driver' : 'customer',
-          message:    message.trim(),
+          rideId: String(rideId),
+          senderId: userId,
+          senderName: senderDisplayName,
+          senderRole,
+          message: message.trim(),
         })
 
-        // Broadcast to everyone in the ride room (both customer + driver)
-        io.to(`ride:${rideId}`).emit('chat:message', {
-          id:         saved._id,
+        const payload = {
+          id:         String(saved._id),
           rideId:     saved.rideId,
           senderId:   saved.senderId,
           senderName: saved.senderName,
           senderRole: saved.senderRole,
           message:    saved.message,
           createdAt:  saved.createdAt,
-        })
+        }
 
-        console.log(`💬 [Chat] ${role} → ride:${rideId}: "${message.trim().slice(0, 40)}"`)
+        // 1. Broadcast to everyone in the room
+        io.to(`ride:${rideId}`).emit('chat:message', payload)
+
+        // 2. Identify recipient and emit direct notification and direct chat message
+        let recipientUserId = null
+        let isDriverRecipient = false
+
+        let rideDoc = null
+        if (rideId.match(/^[0-9a-fA-F]{24}$/)) {
+          rideDoc = await Ride.findById(rideId).select('customerId driverId customerName driverName')
+        }
+        if (!rideDoc) {
+          rideDoc = await Ride.findOne({ bookingId: rideId }).select('customerId driverId customerName driverName')
+        }
+
+        if (rideDoc) {
+          if (role === 'employee') {
+            recipientUserId = String(rideDoc.customerId)
+            isDriverRecipient = false
+          } else {
+            recipientUserId = rideDoc.driverId ? String(rideDoc.driverId) : null
+            isDriverRecipient = true
+          }
+        } else {
+          // Check Parcel
+          const query = rideId.match(/^[0-9a-fA-F]{24}$/)
+            ? { _id: rideId }
+            : { trackingId: rideId }
+          const parcelDoc = await Parcel.findOne(query).select('senderId courierId')
+          if (parcelDoc) {
+            if (role === 'employee') {
+              recipientUserId = String(parcelDoc.senderId)
+              isDriverRecipient = false
+            } else {
+              recipientUserId = parcelDoc.courierId ? String(parcelDoc.courierId) : null
+              isDriverRecipient = true
+            }
+          }
+        }
+
+        // If recipient found and not sender, deliver direct notification
+        if (recipientUserId && recipientUserId !== userId) {
+          const notifPayload = {
+            id: Date.now(),
+            title: `💬 New message from ${senderDisplayName}`,
+            body: message.trim().slice(0, 100),
+            type: 'info',
+            timestamp: new Date().toISOString(),
+            read: false,
+          }
+
+          if (isDriverRecipient) {
+            emitToDriver(io, recipientUserId, 'chat:message', payload)
+            emitToDriver(io, recipientUserId, 'notification:new', notifPayload)
+          } else {
+            emitToUser(io, recipientUserId, 'chat:message', payload)
+            emitToUser(io, recipientUserId, 'notification:new', notifPayload)
+          }
+        }
+
+        console.log(`💬 [Chat] ${role} (${senderDisplayName}) → ride:${rideId}: "${message.trim().slice(0, 40)}"`)
       } catch (err) {
         console.error('[chat:send error]', err.message)
         socket.emit('chat:error', { message: 'Failed to send message.' })

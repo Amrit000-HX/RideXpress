@@ -2,18 +2,18 @@ const mongoose = require('mongoose')
 
 /**
  * chat_messages collection
- * Stores in-app messages exchanged between customers and drivers for a specific ride.
+ * Stores in-app messages exchanged between customers and drivers/couriers.
+ * Uses String for rideId & senderId to support both Mongo ObjectIds and custom booking/tracking IDs.
  */
 const chatMessageSchema = new mongoose.Schema(
   {
     rideId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Ride',
+      type: String,
       required: true,
       index: true,
     },
     senderId: {
-      type: mongoose.Schema.Types.ObjectId,
+      type: String,
       required: true,
     },
     senderName: {
@@ -40,7 +40,7 @@ const chatMessageSchema = new mongoose.Schema(
   { timestamps: true }
 )
 
-// Index for fast chronological message loading per ride
+// Index for fast chronological message loading per ride/delivery
 chatMessageSchema.index({ rideId: 1, createdAt: 1 })
 
 module.exports = mongoose.model('ChatMessage', chatMessageSchema)

@@ -15,7 +15,7 @@ import {
   CircleDot, ArrowUpRight, Wallet, BadgeAlert,
   CheckCircle2, X, Phone, User, Check, KeyRound, MessageSquare,
 } from 'lucide-react'
-import { acceptRideBooking, completeRideBooking } from '../services/rideService'
+import { acceptRideBooking, completeRideBooking, getDriverRideHistory } from '../services/rideService'
 import ChatBox from '../components/ChatBox'
 import './EmployeeDashboard.css'
 
@@ -641,6 +641,24 @@ export default function EmployeeDashboard() {
   const [activeTrip, setActiveTrip]           = useState<any | null>(null)
   const [acceptTimer, setAcceptTimer]         = useState<number>(30)
   const [showDriverChat, setShowDriverChat]   = useState(false)
+  const [driverRides, setDriverRides]         = useState<any[]>([])
+  const [dbEarnings, setDbEarnings]           = useState<number>(0)
+
+  const loadDriverHistory = async () => {
+    try {
+      const res = await getDriverRideHistory()
+      if (res?.rides) {
+        setDriverRides(res.rides)
+        setDbEarnings(res.totalEarnings || 0)
+      }
+    } catch (err) {
+      console.warn('Could not load driver ride history:', err)
+    }
+  }
+
+  useEffect(() => {
+    loadDriverHistory()
+  }, [])
 
   // Listen for real-time ride matching requests from customers
   useEffect(() => {
@@ -690,6 +708,8 @@ export default function EmployeeDashboard() {
     try {
       await completeRideBooking(activeTrip.rideId)
       setActiveTrip(null)
+      setShowDriverChat(false)
+      loadDriverHistory()
     } catch (err) {
       console.error('Failed to complete ride:', err)
     }
@@ -700,7 +720,8 @@ export default function EmployeeDashboard() {
     navigate('/login')
   }
 
-  const todayEarnings = TODAY_DELIVERIES.reduce((s, d) => s + d.earning, 0) +
+  const todayEarnings = (dbEarnings > 0 ? dbEarnings : 0) +
+    TODAY_DELIVERIES.reduce((s, d) => s + d.earning, 0) +
     COMPLETED_LIST.reduce((s, d) => s + d.earning, 0)
 
   return (
