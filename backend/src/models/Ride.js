@@ -53,7 +53,11 @@ const rideSchema = new mongoose.Schema(
       lng:     { type: Number, required: true },
     },
 
-    distanceKm: { type: Number, default: 0 },
+    distanceKm:       { type: Number, default: 0 },
+    estimatedMinutes: { type: Number, default: 0 },
+
+    // Optional user notes / instructions
+    notes: { type: String, default: '', trim: true },
 
     // ── Pricing & Fare Breakdown ──────────────────────────────
     estimatedFare: { type: Number, default: 0 },
@@ -78,13 +82,34 @@ const rideSchema = new mongoose.Schema(
     // ── Lifecycle & Status ────────────────────────────────────
     status: {
       type: String,
-      enum: ['searching', 'requested', 'assigned', 'in_progress', 'completed', 'cancelled'],
+      enum: [
+        'searching',       // Looking for a driver
+        'requested',       // Sent to a specific driver, awaiting response
+        'assigned',        // Driver accepted
+        'rider_arriving',  // Driver en-route to pickup
+        'rider_arrived',   // Driver at pickup location
+        'in_progress',     // Ride started (formerly just accepted)
+        'completed',       // Trip done
+        'cancelled',       // Cancelled by user or driver
+        'rejected',        // All drivers rejected / no driver found
+        'expired',         // Timeout - no driver responded
+      ],
       default: 'searching',
       index: true,
     },
 
+    // ── Reassignment tracking ─────────────────────────────────
+    // Driver IDs that rejected this ride (excluded from future matching attempts)
+    rejectedBy: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Employee' }],
+
+    // Who cancelled and why
+    cancelledBy:        { type: String, enum: ['user', 'rider', 'driver', 'system', null], default: null },
+    cancellationReason: { type: String, default: '', trim: true },
+
+    // ── Timestamps for each lifecycle stage ──────────────────
     bookedAt:    { type: Date, default: Date.now },
     acceptedAt:  { type: Date, default: null },
+    arrivedAt:   { type: Date, default: null },
     startedAt:   { type: Date, default: null },
     completedAt: { type: Date, default: null },
     cancelledAt: { type: Date, default: null },
@@ -99,5 +124,10 @@ const rideSchema = new mongoose.Schema(
   },
   { timestamps: true }
 )
+
+// Compound indexes for efficient availability and history queries
+rideSchema.index({ status: 1, createdAt: -1 })
+rideSchema.index({ customerId: 1, status: 1 })
+rideSchema.index({ driverId: 1, status: 1 })
 
 module.exports = mongoose.model('Ride', rideSchema)

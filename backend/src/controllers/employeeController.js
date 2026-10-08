@@ -1,4 +1,5 @@
 const Employee = require('../models/Employee')
+const { cleanupDriverStaleRides } = require('./rideController')
 
 /* ═══════════════════════════════════════════════════════════════
    GET /api/employees   — Protected: admin only
@@ -76,6 +77,10 @@ exports.updateOnlineStatus = async (req, res) => {
     const { status } = req.body
     if (!['ONLINE', 'OFFLINE'].includes(status)) {
       return res.status(400).json({ success: false, message: 'Status must be ONLINE or OFFLINE.' })
+    }
+
+    if (status === 'ONLINE') {
+      await cleanupDriverStaleRides(req.user.id)
     }
 
     const employee = await Employee.findByIdAndUpdate(

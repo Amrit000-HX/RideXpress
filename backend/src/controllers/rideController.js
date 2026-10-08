@@ -8,8 +8,8 @@ const { getConnectedDrivers } = require('../socket/socketManager')
 const VALID_TRANSITIONS = {
   searching:      ['requested', 'assigned', 'expired', 'cancelled', 'rejected'],
   requested:      ['assigned', 'searching', 'rejected', 'expired', 'cancelled'],
-  assigned:       ['rider_arriving', 'cancelled'],
-  rider_arriving: ['rider_arrived', 'cancelled'],
+  assigned:       ['rider_arriving', 'rider_arrived', 'in_progress', 'cancelled'],
+  rider_arriving: ['rider_arrived', 'in_progress', 'cancelled'],
   rider_arrived:  ['in_progress', 'cancelled'],
   in_progress:    ['completed', 'cancelled'],
   completed:      [],
@@ -21,6 +21,104 @@ const VALID_TRANSITIONS = {
 function canTransition(from, to) {
   return (VALID_TRANSITIONS[from] || []).includes(to)
 }
+
+/**
+ * Safe helper to query a ride either by MongoDB ObjectId or human-readable bookingId
+ */
+function getRideFilter(id) {
+  if (!id || typeof id !== 'string' || id === '[object Object]' || id === 'undefined' || id === 'null') {
+    return null
+  }
+  const cleanId = String(id).trim()
+  return cleanId.match(/^[0-9a-fA-F]{24}$/) ? { _id: cleanId } : { bookingId: cleanId }
+}
+
+/**
+ * Safely inspects the driver's existing rides and reconciles state:
+ * 1. An in_progress ride MUST have a valid startedAt. If marked in_progress but startedAt is missing,
+ *    it was never validly started. If older than 30 mins, mark cancelled; if recent, revert to assigned.
+ * 2. Any unstarted ride (assigned, rider_arriving, rider_arrived) that is older than 30 minutes
+ *    is a stale/abandoned assignment from a prior session and should be marked cancelled.
+ * 3. Legitimate active trips (status === 'in_progress' with startedAt) are PRESERVED and NEVER cancelled.
+ * 4. Recent valid assignments (< 30 minutes old) are kept as 'assigned' awaiting driver arrival.
+ * 5. Reconciles the Employee doc: if no active or recent assignment remains, reset availabilityStatus to 'AVAILABLE'
+ *    and currentRideId to null.
+ */
+async function cleanupDriverStaleRides(driverId) {
+  try {
+    const thirtyMinutesAgo = new Date(Date.now() - 30 * 60 * 1000)
+
+    const openRides = await Ride.find({
+      driverId,
+      status: { $in: ['assigned', 'rider_arriving', 'rider_arrived', 'in_progress'] }
+    })
+
+    let currentAssignedRideId = null
+
+    for (const r of openRides) {
+      if (r.status === 'in_progress') {
+        if (!r.startedAt) {
+          // In-progress without startedAt is invalid
+          if (r.createdAt < thirtyMinutesAgo) {
+            r.status = 'cancelled'
+            r.cancelledBy = 'system'
+            r.cancellationReason = 'Stale unstarted ride cancelled'
+            r.cancelledAt = new Date()
+            r.timeline.push({
+              status: 'cancelled',
+              timestamp: new Date(),
+              note: 'Cancelled stale unstarted ride on driver session reconciliation'
+            })
+            await r.save()
+          } else {
+            // Fresh (<30m) but not yet validly started: revert to assigned
+            r.status = 'assigned'
+            await r.save()
+            currentAssignedRideId = r._id
+          }
+        } else {
+          // Legitimate in_progress ride with startedAt: PRESERVE AND DO NOT CANCEL
+          currentAssignedRideId = r._id
+        }
+      } else if (['assigned', 'rider_arriving', 'rider_arrived'].includes(r.status)) {
+        if (r.createdAt < thirtyMinutesAgo) {
+          // Stale assignment from prior session older than 30 minutes: cancel it
+          r.status = 'cancelled'
+          r.cancelledBy = 'system'
+          r.cancellationReason = 'Stale unstarted ride expired'
+          r.cancelledAt = new Date()
+          r.timeline.push({
+            status: 'cancelled',
+            timestamp: new Date(),
+            note: 'Expired stale unstarted ride from prior session'
+          })
+          await r.save()
+        } else {
+          // Recent assignment: keep it
+          currentAssignedRideId = r._id
+        }
+      }
+    }
+
+    // Update Employee document to match actual state
+    const driver = await Employee.findById(driverId)
+    if (driver) {
+      if (currentAssignedRideId) {
+        driver.currentRideId = currentAssignedRideId
+        driver.availabilityStatus = 'BUSY'
+      } else {
+        driver.currentRideId = null
+        if (driver.onlineStatus === 'ONLINE') {
+          driver.availabilityStatus = 'AVAILABLE'
+        }
+      }
+      await driver.save()
+    }
+  } catch (err) {
+    console.error('[cleanupDriverStaleRides]', err)
+  }
+}
+
 
 /**
  * Concurrency-safe timeout handler:
@@ -292,7 +390,6 @@ exports.createRide = async (req, res) => {
         distanceKm: ride.distanceKm,
         estimatedMinutes: ride.estimatedMinutes,
         estimatedFare: ride.estimatedFare,
-        startRidePin: ride.startRidePin,
         vehicleType: ride.vehicleType,
         notes: ride.notes,
         timeoutSeconds: 30,
@@ -387,9 +484,13 @@ exports.acceptRide = async (req, res) => {
 
     // 2. Atomic Conditional Update: Only one driver can succeed
     // Matches ONLY if ride status is still 'searching' or 'requested'
+    const rideFilter = getRideFilter(id)
+    if (!rideFilter) {
+      return res.status(400).json({ success: false, message: 'Invalid ride ID provided.' })
+    }
     const updated = await Ride.findOneAndUpdate(
       {
-        _id: id,
+        ...rideFilter,
         status: { $in: ['searching', 'requested'] },
       },
       {
@@ -450,29 +551,33 @@ exports.acceptRide = async (req, res) => {
         },
       }
 
-      io.emitToUser(String(updated.customerId), 'ride:accepted', acceptPayload)
+      if (typeof io.emitToUser === 'function') {
+        io.emitToUser(String(updated.customerId), 'ride:accepted', acceptPayload)
+        io.emitToUser(String(updated.customerId), 'notification:new', {
+          id: Date.now(),
+          title: '✅ Driver Accepted!',
+          body: `${driverProfile.name || 'Your driver'} has accepted your ride and is heading to you.`,
+          type: 'success',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
       io.to(`ride:${updated._id}`).emit('ride:accepted', acceptPayload)
-
-      io.emitToUser(String(updated.customerId), 'notification:new', {
-        id: Date.now(),
-        title: '✅ Driver Accepted!',
-        body: `${driverProfile.name || 'Your driver'} has accepted your ride and is heading to you.`,
-        type: 'success',
-        timestamp: new Date().toISOString(),
-        read: false,
-      })
+      io.to(`user:${updated.customerId}`).emit('ride:accepted', acceptPayload)
 
       // 5. Notify the winning driver
       io.to(`driver:${req.user.id}`).emit('driver:assigned_ride', updated)
-      io.emitToDriver(String(req.user.id), 'driver:assigned_ride', updated)
-      io.emitToDriver(String(req.user.id), 'notification:new', {
-        id: Date.now() + 1,
-        title: '🎯 Ride Accepted',
-        body: `You accepted the ride for ${updated.customerName}. Head to pickup: ${updated.pickup.address}`,
-        type: 'success',
-        timestamp: new Date().toISOString(),
-        read: false,
-      })
+      if (typeof io.emitToDriver === 'function') {
+        io.emitToDriver(String(req.user.id), 'driver:assigned_ride', updated)
+        io.emitToDriver(String(req.user.id), 'notification:new', {
+          id: Date.now() + 1,
+          title: '🎯 Ride Accepted',
+          body: `You accepted the ride for ${updated.customerName}. Head to pickup: ${updated.pickup?.address || 'Pickup point'}`,
+          type: 'success',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
 
       // 6. Broadcast to all other drivers that this ride is now taken (dismiss modal)
       io.emit('ride:unavailable', { rideId: String(updated._id) })
@@ -481,7 +586,7 @@ exports.acceptRide = async (req, res) => {
     return res.status(200).json({ success: true, message: 'Ride accepted successfully.', ride: updated })
   } catch (err) {
     console.error('[acceptRide]', err)
-    res.status(500).json({ success: false, message: 'Server error.' })
+    res.status(500).json({ success: false, message: err.message || 'Server error.' })
   }
 }
 
@@ -534,7 +639,8 @@ exports.cancelRide = async (req, res) => {
   try {
     const { id } = req.params
     const { reason } = req.body
-    const ride = await Ride.findById(id)
+    const rideFilter = getRideFilter(id)
+    const ride = await Ride.findOne(rideFilter)
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found.' })
 
     const isUser   = req.user.role === 'user'
@@ -548,8 +654,8 @@ exports.cancelRide = async (req, res) => {
       return res.status(403).json({ success: false, message: 'Not authorized to cancel this ride.' })
     }
 
-    // Status check: only cancellable while in progress (not completed, already cancelled, etc.)
-    const cancellableStatuses = ['searching', 'requested', 'assigned', 'rider_arriving', 'rider_arrived']
+    // Status check: only cancellable while not completed or already cancelled
+    const cancellableStatuses = ['searching', 'requested', 'assigned', 'rider_arriving', 'rider_arrived', 'in_progress']
     if (!cancellableStatuses.includes(ride.status)) {
       return res.status(409).json({
         success: false,
@@ -570,8 +676,12 @@ exports.cancelRide = async (req, res) => {
     })
     await ride.save()
 
-    // Free driver in RAM
+    // Free driver in DB and in RAM registry
     if (ride.driverId) {
+      await Employee.findByIdAndUpdate(ride.driverId, {
+        availabilityStatus: 'AVAILABLE',
+        currentRideId: null,
+      })
       const connectedDrivers = getConnectedDrivers()
       const entry = connectedDrivers.get(String(ride.driverId))
       if (entry) {
@@ -581,20 +691,24 @@ exports.cancelRide = async (req, res) => {
 
     const io = req.app.get('io')
     if (io) {
-      // Notify both parties
-      io.emitToUser(String(ride.customerId), 'ride:cancelled', {
+      const cancelPayload = {
         rideId: ride._id,
         bookingId: ride.bookingId,
         cancelledBy,
         reason: reason || '',
-      })
+      }
+
+      if (typeof io.emitToUser === 'function') {
+        io.emitToUser(String(ride.customerId), 'ride:cancelled', cancelPayload)
+      }
+      io.to(`ride:${ride._id}`).emit('ride:cancelled', cancelPayload)
+      io.to(`user:${ride.customerId}`).emit('ride:cancelled', cancelPayload)
+
       if (ride.driverId) {
-        io.emitToDriver(String(ride.driverId), 'ride:cancelled', {
-          rideId: ride._id,
-          bookingId: ride.bookingId,
-          cancelledBy,
-          reason: reason || '',
-        })
+        if (typeof io.emitToDriver === 'function') {
+          io.emitToDriver(String(ride.driverId), 'ride:cancelled', cancelPayload)
+        }
+        io.to(`driver:${ride.driverId}`).emit('ride:cancelled', cancelPayload)
       }
 
       const notifMsg = cancelledBy === 'user'
@@ -602,24 +716,28 @@ exports.cancelRide = async (req, res) => {
         : 'The driver cancelled your ride.'
 
       if (cancelledBy !== 'user') {
-        io.emitToUser(String(ride.customerId), 'notification:new', {
-          id: Date.now(),
-          title: '❌ Ride Cancelled',
-          body: notifMsg + (reason ? ` Reason: ${reason}` : ''),
-          type: 'error',
-          timestamp: new Date().toISOString(),
-          read: false,
-        })
+        if (typeof io.emitToUser === 'function') {
+          io.emitToUser(String(ride.customerId), 'notification:new', {
+            id: Date.now(),
+            title: '❌ Ride Cancelled',
+            body: notifMsg + (reason ? ` Reason: ${reason}` : ''),
+            type: 'error',
+            timestamp: new Date().toISOString(),
+            read: false,
+          })
+        }
       }
       if (cancelledBy !== 'rider' && ride.driverId) {
-        io.emitToDriver(String(ride.driverId), 'notification:new', {
-          id: Date.now() + 1,
-          title: '❌ Ride Cancelled by Passenger',
-          body: `${ride.customerName} cancelled the ride.`,
-          type: 'warning',
-          timestamp: new Date().toISOString(),
-          read: false,
-        })
+        if (typeof io.emitToDriver === 'function') {
+          io.emitToDriver(String(ride.driverId), 'notification:new', {
+            id: Date.now() + 1,
+            title: '❌ Ride Cancelled by Passenger',
+            body: `${ride.customerName} cancelled the ride.`,
+            type: 'warning',
+            timestamp: new Date().toISOString(),
+            read: false,
+          })
+        }
       }
     }
 
@@ -636,11 +754,16 @@ exports.cancelRide = async (req, res) => {
 exports.markArrived = async (req, res) => {
   try {
     const { id } = req.params
-    const ride = await Ride.findById(id)
+    const rideFilter = getRideFilter(id)
+    const ride = await Ride.findOne(rideFilter)
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found.' })
 
     if (String(ride.driverId) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: 'Only the assigned driver can mark arrival.' })
+    }
+
+    if (ride.status === 'rider_arrived') {
+      return res.status(200).json({ success: true, message: 'Driver already marked as arrived.', ride })
     }
 
     if (!canTransition(ride.status, 'rider_arrived')) {
@@ -661,47 +784,51 @@ exports.markArrived = async (req, res) => {
 
     const io = req.app.get('io')
     if (io) {
-      io.emitToUser(String(ride.customerId), 'ride:status_changed', {
+      const arrivedPayload = {
         rideId: ride._id,
         bookingId: ride.bookingId,
         status: 'rider_arrived',
         arrivedAt: ride.arrivedAt,
-      })
-
-      io.emitToUser(String(ride.customerId), 'notification:new', {
-        id: Date.now(),
-        title: '📍 Driver Arrived!',
-        body: `${ride.driverName} has arrived at your pickup location. Please come out.`,
-        type: 'success',
-        timestamp: new Date().toISOString(),
-        read: false,
-      })
+      }
+      if (typeof io.emitToUser === 'function') {
+        io.emitToUser(String(ride.customerId), 'ride:status_changed', arrivedPayload)
+        io.emitToUser(String(ride.customerId), 'notification:new', {
+          id: Date.now(),
+          title: '📍 Driver Arrived!',
+          body: `${ride.driverName} has arrived at your pickup location. Please share your 4-digit PIN upon boarding.`,
+          type: 'success',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
+      io.to(`ride:${ride._id}`).emit('ride:status_changed', arrivedPayload)
+      io.to(`user:${ride.customerId}`).emit('ride:status_changed', arrivedPayload)
     }
 
     return res.status(200).json({ success: true, message: 'Marked as arrived at pickup.', ride })
   } catch (err) {
     console.error('[markArrived]', err)
-    res.status(500).json({ success: false, message: 'Server error.' })
+    res.status(500).json({ success: false, message: err.message || 'Server error.' })
   }
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   POST /api/rides/:id/start   — Driver Starts the Ride
+   POST /api/rides/:id/start   — Driver Starts the Ride with Mandatory PIN
    ═══════════════════════════════════════════════════════════════ */
 exports.startRide = async (req, res) => {
   try {
     const { id } = req.params
     const { pin } = req.body
-    const ride = await Ride.findById(id)
+    const rideFilter = getRideFilter(id)
+    const ride = await Ride.findOne(rideFilter)
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found.' })
 
     if (String(ride.driverId) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: 'Only the assigned driver can start the ride.' })
     }
 
-    // Optional PIN verification
-    if (pin && ride.startRidePin && pin !== ride.startRidePin) {
-      return res.status(400).json({ success: false, message: 'Incorrect start PIN.' })
+    if (ride.status === 'in_progress') {
+      return res.status(200).json({ success: true, message: 'Ride is already in progress.', ride })
     }
 
     const allowedFromStatuses = ['assigned', 'rider_arriving', 'rider_arrived']
@@ -712,38 +839,52 @@ exports.startRide = async (req, res) => {
       })
     }
 
+    // MANDATORY PIN verification:
+    if (ride.startRidePin) {
+      if (!pin || String(pin).trim() !== String(ride.startRidePin).trim()) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid or missing start PIN. Please ask the passenger for their 4-digit PIN.',
+        })
+      }
+    }
+
     ride.status = 'in_progress'
     ride.startedAt = new Date()
     ride.timeline.push({
       status: 'in_progress',
       timestamp: new Date(),
-      note: `Ride started by driver ${req.user.name || req.user.id}`,
+      note: `Ride started after verified start PIN by driver ${req.user.name || req.user.id}`,
     })
     await ride.save()
 
     const io = req.app.get('io')
     if (io) {
-      io.emitToUser(String(ride.customerId), 'ride:status_changed', {
+      const startPayload = {
         rideId: ride._id,
         bookingId: ride.bookingId,
         status: 'in_progress',
         startedAt: ride.startedAt,
-      })
-
-      io.emitToUser(String(ride.customerId), 'notification:new', {
-        id: Date.now(),
-        title: '🚀 Ride Started!',
-        body: `Your ride to ${ride.drop.address} has begun. Estimated: ${ride.estimatedMinutes || '?'} min`,
-        type: 'info',
-        timestamp: new Date().toISOString(),
-        read: false,
-      })
+      }
+      if (typeof io.emitToUser === 'function') {
+        io.emitToUser(String(ride.customerId), 'ride:status_changed', startPayload)
+        io.emitToUser(String(ride.customerId), 'notification:new', {
+          id: Date.now(),
+          title: '🚀 Ride Started!',
+          body: `Your ride to ${ride.drop?.address || 'destination'} has begun.`,
+          type: 'info',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
+      io.to(`ride:${ride._id}`).emit('ride:status_changed', startPayload)
+      io.to(`user:${ride.customerId}`).emit('ride:status_changed', startPayload)
     }
 
-    return res.status(200).json({ success: true, message: 'Ride started.', ride })
+    return res.status(200).json({ success: true, message: 'Ride started successfully.', ride })
   } catch (err) {
     console.error('[startRide]', err)
-    res.status(500).json({ success: false, message: 'Server error.' })
+    res.status(500).json({ success: false, message: err.message || 'Server error.' })
   }
 }
 
@@ -753,11 +894,16 @@ exports.startRide = async (req, res) => {
 exports.completeRide = async (req, res) => {
   try {
     const { id } = req.params
-    const ride = await Ride.findById(id)
+    const rideFilter = getRideFilter(id)
+    const ride = await Ride.findOne(rideFilter)
     if (!ride) return res.status(404).json({ success: false, message: 'Ride not found.' })
 
     if (String(ride.driverId) !== String(req.user.id)) {
       return res.status(403).json({ success: false, message: 'Only the assigned driver can complete the ride.' })
+    }
+
+    if (ride.status === 'completed') {
+      return res.status(200).json({ success: true, message: 'Ride is already completed.', ride })
     }
 
     if (ride.status !== 'in_progress') {
@@ -777,7 +923,11 @@ exports.completeRide = async (req, res) => {
     })
     await ride.save()
 
-    // Free driver in RAM registry
+    // Free driver in DB and in RAM registry
+    await Employee.findByIdAndUpdate(req.user.id, {
+      availabilityStatus: 'AVAILABLE',
+      currentRideId: null,
+    })
     const connectedDrivers = getConnectedDrivers()
     const entry = connectedDrivers.get(String(req.user.id))
     if (entry) {
@@ -786,33 +936,38 @@ exports.completeRide = async (req, res) => {
 
     const io = req.app.get('io')
     if (io) {
-      io.emitToUser(String(ride.customerId), 'ride:status_changed', {
+      const completedPayload = {
         rideId: ride._id,
         bookingId: ride.bookingId,
         status: 'completed',
         completedAt: ride.completedAt,
         finalFare: ride.actualFare || ride.estimatedFare,
-      })
-
-      // Notify customer
-      io.emitToUser(String(ride.customerId), 'notification:new', {
-        id: Date.now(),
-        title: '🏁 Ride Completed!',
-        body: `You arrived safely! Total Fare: ₹${ride.actualFare || ride.estimatedFare}. Thank you for riding with RideXpress!`,
-        type: 'success',
-        timestamp: new Date().toISOString(),
-        read: false,
-      })
+      }
+      if (typeof io.emitToUser === 'function') {
+        io.emitToUser(String(ride.customerId), 'ride:status_changed', completedPayload)
+        io.emitToUser(String(ride.customerId), 'notification:new', {
+          id: Date.now(),
+          title: '🏁 Ride Completed!',
+          body: `You arrived safely! Total Fare: ₹${ride.actualFare || ride.estimatedFare}. Thank you for riding with RideXpress!`,
+          type: 'success',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
+      io.to(`ride:${ride._id}`).emit('ride:status_changed', completedPayload)
+      io.to(`user:${ride.customerId}`).emit('ride:status_changed', completedPayload)
 
       // Notify driver
-      io.emitToDriver(String(req.user.id), 'notification:new', {
-        id: Date.now() + 1,
-        title: '💵 Ride Earnings Credited',
-        body: `Trip completed for ${ride.customerName}. ₹${ride.actualFare || ride.estimatedFare} added to your earnings.`,
-        type: 'success',
-        timestamp: new Date().toISOString(),
-        read: false,
-      })
+      if (typeof io.emitToDriver === 'function') {
+        io.emitToDriver(String(req.user.id), 'notification:new', {
+          id: Date.now() + 1,
+          title: '💵 Ride Earnings Credited',
+          body: `Trip completed for ${ride.customerName}. ₹${ride.actualFare || ride.estimatedFare} added to your earnings.`,
+          type: 'success',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
     }
 
     return res.status(200).json({ success: true, message: 'Ride completed successfully.', ride })
@@ -954,6 +1109,8 @@ exports.getAvailableRides = async (req, res) => {
    ═══════════════════════════════════════════════════════════════ */
 exports.getDriverActiveRide = async (req, res) => {
   try {
+    await cleanupDriverStaleRides(req.user.id)
+
     const activeStatuses = ['assigned', 'rider_arriving', 'rider_arrived', 'in_progress']
     const ride = await Ride.findOne({
       driverId: req.user.id,
@@ -989,4 +1146,6 @@ exports.getAllRides = async (req, res) => {
 }
 
 exports.handleRideSearchTimeout = handleRideSearchTimeout
+exports.cleanupDriverStaleRides = cleanupDriverStaleRides
+
 

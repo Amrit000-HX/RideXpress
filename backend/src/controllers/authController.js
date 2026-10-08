@@ -4,6 +4,7 @@ const Employee = require('../models/Employee')
 const Otp = require('../models/Otp')
 const { generateToken } = require('../utils/generateToken')
 const { sendOtpEmail } = require('../utils/emailService')
+const { cleanupDriverStaleRides } = require('./rideController')
 
 const SALT_ROUNDS = 10
 
@@ -297,6 +298,10 @@ exports.verifyOtp = async (req, res) => {
       return res.status(404).json({ success: false, message: 'Account not found.' })
     }
 
+    if (account.role === 'employee') {
+      await cleanupDriverStaleRides(account._id)
+    }
+
     // ── Generate JWT token ────────────────────────────────────
     const token = generateToken({ id: account._id, role: account.role })
 
@@ -426,6 +431,10 @@ exports.login = async (req, res) => {
     const isMatch = await bcrypt.compare(password, account.passwordHash)
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid email or password.' })
+    }
+
+    if (account.role === 'employee') {
+      await cleanupDriverStaleRides(account._id)
     }
 
     const token = generateToken({ id: account._id, role: account.role })

@@ -13,7 +13,7 @@ import {
   ArrowRight, MapPin, Zap, LogOut, Truck, ChevronRight,
   BarChart3, Navigation, Timer, CalendarDays,
   CircleDot, ArrowUpRight, Wallet, BadgeAlert,
-  X, Check, MessageSquare,
+  X, Check, MessageSquare, KeyRound,
 } from 'lucide-react'
 import {
   acceptRideBooking,
@@ -643,6 +643,9 @@ export default function EmployeeDashboard() {
   const [activeTrip, setActiveTrip]           = useState<any | null>(null)
   const [acceptTimer, setAcceptTimer]         = useState<number>(30)
   const [showDriverChat, setShowDriverChat]   = useState(false)
+  const [showPinModal, setShowPinModal]       = useState(false)
+  const [enteredPin, setEnteredPin]           = useState('')
+  const [pinError, setPinError]               = useState('')
   const [driverRides, setDriverRides]         = useState<any[]>([])
   const [dbEarnings, setDbEarnings]           = useState<number>(0)
   const [tripStatus, setTripStatus]           = useState<string>('assigned')
@@ -672,9 +675,12 @@ export default function EmployeeDashboard() {
       if (ride) {
         setActiveTrip(ride)
         setTripStatus(ride.status)
+      } else {
+        setActiveTrip(null)
       }
     } catch (err) {
       console.warn('Could not load active trip:', err)
+      setActiveTrip(null)
     }
   }
 
@@ -745,16 +751,40 @@ export default function EmployeeDashboard() {
       loadDriverHistory()
     }
 
+    const handleRideCancelled = (data: any) => {
+      const cId = data?.rideId
+      setActiveTrip((prev: any) => {
+        if (!prev) return null
+        if (cId && (String(cId) === String(prev.rideId) || String(cId) === String(prev._id))) {
+          return null
+        }
+        return prev
+      })
+      setIncomingRequest((prev: any) => {
+        if (!prev) return null
+        if (cId && (String(cId) === String(prev.rideId) || String(cId) === String(prev._id))) {
+          return null
+        }
+        return prev
+      })
+      if (cId) {
+        setAvailableRides((prev) => prev.filter((r) => String(r.rideId || r._id) !== String(cId)))
+      }
+      loadDriverHistory()
+    }
+
     socket.on('ride:incoming_request', handleIncomingRequest)
     socket.on('ride:new_available', handleNewAvailable)
     socket.on('ride:unavailable', handleRideUnavailable)
     socket.on('driver:assigned_ride', handleDriverAssignedRide)
+    socket.on('ride:cancelled', handleRideCancelled)
 
     return () => {
       socket.off('ride:incoming_request', handleIncomingRequest)
       socket.off('ride:new_available', handleNewAvailable)
       socket.off('ride:unavailable', handleRideUnavailable)
       socket.off('driver:assigned_ride', handleDriverAssignedRide)
+      socket.off('ride:cancelled', handleRideCancelled)
     }
   }, [socket, isConnected])
 
@@ -850,9 +880,11 @@ export default function EmployeeDashboard() {
     }
   }, [isOnline, socket, isConnected, activeTrip?._id]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const handleAcceptRide = async (rideIdToAccept?: string) => {
-    const rId = rideIdToAccept || incomingRequest?.rideId || incomingRequest?._id
-    if (!rId) return
+  const handleAcceptRide = async (rideIdToAccept?: any) => {
+    const rId = (typeof rideIdToAccept === 'string' && rideIdToAccept && rideIdToAccept !== '[object Object]')
+      ? rideIdToAccept
+      : (incomingRequest?.rideId || incomingRequest?._id)
+    if (!rId || typeof rId !== 'string') return
     setActionLoading('accept')
     try {
       const res = await acceptRideBooking(rId)
@@ -904,15 +936,32 @@ export default function EmployeeDashboard() {
     }
   }
 
-  const handleStartRide = async () => {
+  const handleStartRide = () => {
     if (!activeTrip) return
+    setPinError('')
+    setEnteredPin('')
+    setShowPinModal(true)
+  }
+
+  const handleVerifyPinAndStart = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault()
+    if (!activeTrip) return
+    if (!enteredPin || enteredPin.trim().length !== 4) {
+      setPinError('Please enter the complete 4-digit start PIN provided by the passenger.')
+      return
+    }
     setActionLoading('start')
+    setPinError('')
     try {
-      await startRideBooking(activeTrip.rideId || activeTrip._id)
+      const res = await startRideBooking(activeTrip.rideId || activeTrip._id, enteredPin.trim())
       setTripStatus('in_progress')
-      setActiveTrip((prev: any) => ({ ...prev, status: 'in_progress' }))
-    } catch (err) {
+      setActiveTrip((prev: any) => ({ ...prev, ...(res?.ride || {}), status: 'in_progress' }))
+      setShowPinModal(false)
+      setEnteredPin('')
+    } catch (err: any) {
       console.error('Failed to start ride:', err)
+      const msg = err?.response?.data?.message || err?.message || 'Incorrect start PIN. Please ask the passenger for the code.'
+      setPinError(msg)
     } finally {
       setActionLoading(null)
     }
@@ -1077,14 +1126,14 @@ export default function EmployeeDashboard() {
               {/* Actions */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
                 <button
-                  onClick={handleRejectRide}
+                  onClick={() => handleRejectRide()}
                   disabled={actionLoading === 'reject' || actionLoading === 'accept'}
                   style={{ padding: '14px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '14px', fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.7 : 1 }}
                 >
                   {actionLoading === 'reject' ? '…' : 'Reject'}
                 </button>
                 <button
-                  onClick={handleAcceptRide}
+                  onClick={() => handleAcceptRide()}
                   disabled={actionLoading === 'accept' || actionLoading === 'reject'}
                   style={{ padding: '14px', background: '#6B9E72', color: '#ffffff', border: 'none', borderRadius: '14px', fontWeight: 800, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(107, 158, 114, 0.4)', opacity: actionLoading ? 0.7 : 1 }}
                 >
@@ -1097,88 +1146,113 @@ export default function EmployeeDashboard() {
       </AnimatePresence>
 
       {/* ══════════════════════════════════════════════
-          ACTIVE TRIP IN PROGRESS BANNER (Phase 3)
+          ACTIVE TRIP / LIFECYCLE BANNER
          ══════════════════════════════════════════════ */}
-      {activeTrip && (
-        <div style={{ background: '#1A1A1A', borderBottom: '2px solid #6B9E72', padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.3)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#6B9E72', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff' }}>
-              <Navigation size={18} />
+      {activeTrip && (() => {
+        const isAssigned = tripStatus === 'assigned'
+        const isEnRoute = tripStatus === 'rider_arriving'
+        const isArrived = tripStatus === 'rider_arrived'
+        const isInProgress = tripStatus === 'in_progress'
+
+        const bannerTitle = isAssigned
+          ? `New Trip Assigned — ${activeTrip.customerName} (₹${activeTrip.estimatedFare})`
+          : isEnRoute
+          ? `En Route to Pickup — ${activeTrip.customerName}`
+          : isArrived
+          ? `Arrived at Pickup — Awaiting Passenger PIN`
+          : `Active Trip in Progress — ${activeTrip.customerName} (₹${activeTrip.estimatedFare})`
+
+        const bannerSubtitle = (isAssigned || isEnRoute)
+          ? `📍 Pickup: ${activeTrip.pickup?.address?.slice(0, 48) || 'Pickup location'} · Head to passenger`
+          : isArrived
+          ? `📍 Passenger boarding · Ask passenger for their 4-digit start PIN`
+          : `📍 To: ${activeTrip.drop?.address?.slice(0, 48) || 'Destination'}`
+
+        const statusBadge = isAssigned ? 'ASSIGNED' : isEnRoute ? 'EN ROUTE' : isArrived ? 'ARRIVED' : 'IN PROGRESS'
+        const statusColor = isArrived ? '#f59e0b' : isInProgress ? '#6B9E72' : '#3b82f6'
+
+        return (
+          <div style={{ background: '#1A1A1A', borderBottom: `2px solid ${statusColor}`, padding: '16px 24px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', position: 'sticky', top: 0, zIndex: 100, boxShadow: '0 4px 20px rgba(0,0,0,0.3)', flexWrap: 'wrap', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+              <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: statusColor, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', boxShadow: `0 0 12px ${statusColor}44` }}>
+                <Navigation size={18} />
+              </div>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                  <span style={{ fontSize: '14px', fontWeight: 800, color: '#F5F0E8' }}>{bannerTitle}</span>
+                  <span style={{ fontSize: '10px', fontWeight: 800, padding: '2px 8px', borderRadius: '8px', background: `${statusColor}22`, color: statusColor, border: `1px solid ${statusColor}44` }}>{statusBadge}</span>
+                </div>
+                <div style={{ fontSize: '12px', color: '#6B9E72', marginTop: '2px' }}>
+                  {bannerSubtitle}
+                </div>
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: '14px', fontWeight: 800, color: '#F5F0E8' }}>
-                Active Trip in Progress — {activeTrip.customerName} (₹{activeTrip.estimatedFare})
-              </div>
-              <div style={{ fontSize: '12px', color: '#6B9E72' }}>
-                📍 To: {activeTrip.drop?.address?.slice(0, 45)}… · Start PIN: {activeTrip.startRidePin}
-              </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setShowDriverChat((prev) => !prev)}
+                style={{
+                  background: showDriverChat ? '#6B9E72' : 'rgba(255, 255, 255, 0.08)',
+                  border: '1px solid rgba(107, 158, 114, 0.4)',
+                  color: '#F5F0E8',
+                  borderRadius: '12px',
+                  padding: '9px 14px',
+                  fontWeight: 700,
+                  fontSize: '12px',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <MessageSquare size={14} />
+                <span>{showDriverChat ? 'Close Chat' : 'Chat'}</span>
+              </button>
+
+              {/* Arrived at pickup button — when driver is assigned or en route */}
+              {(tripStatus === 'assigned' || tripStatus === 'rider_arriving') && (
+                <button
+                  onClick={handleMarkArrived}
+                  disabled={!!actionLoading}
+                  style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '12px', padding: '9px 14px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <MapPin size={13} /> {actionLoading === 'arrived' ? 'Marking…' : 'Arrived at Pickup'}
+                </button>
+              )}
+
+              {/* Verify PIN & Start ride button — requires PIN verification */}
+              {(tripStatus === 'rider_arrived' || tripStatus === 'assigned' || tripStatus === 'rider_arriving') && (
+                <button
+                  onClick={handleStartRide}
+                  disabled={!!actionLoading}
+                  style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.35)', borderRadius: '12px', padding: '9px 14px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}
+                >
+                  <KeyRound size={13} /> {actionLoading === 'start' ? 'Starting…' : 'Verify PIN & Start'}
+                </button>
+              )}
+
+              {/* Complete button — only when in progress */}
+              {tripStatus === 'in_progress' && (
+                <button
+                  onClick={handleCompleteRide}
+                  disabled={!!actionLoading}
+                  style={{ background: '#6B9E72', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+                >
+                  {actionLoading === 'complete' ? 'Completing…' : 'Complete Trip ✓'}
+                </button>
+              )}
+
+              {/* Driver Cancel button */}
+              <button
+                onClick={handleDriverCancelRide}
+                disabled={!!actionLoading}
+                style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '12px', padding: '9px 12px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: actionLoading ? 0.6 : 1 }}
+              >
+                <X size={13} /> Cancel
+              </button>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-            <button
-              onClick={() => setShowDriverChat((prev) => !prev)}
-              style={{
-                background: showDriverChat ? '#6B9E72' : 'rgba(255, 255, 255, 0.08)',
-                border: '1px solid rgba(107, 158, 114, 0.4)',
-                color: '#F5F0E8',
-                borderRadius: '12px',
-                padding: '9px 14px',
-                fontWeight: 700,
-                fontSize: '12px',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-              }}
-            >
-              <MessageSquare size={14} />
-              <span>{showDriverChat ? 'Close Chat' : 'Chat'}</span>
-            </button>
-
-            {/* Arrived at pickup button — only when not yet arrived */}
-            {(tripStatus === 'assigned' || tripStatus === 'rider_arriving') && (
-              <button
-                onClick={handleMarkArrived}
-                disabled={!!actionLoading}
-                style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '12px', padding: '9px 14px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}
-              >
-                <MapPin size={13} /> {actionLoading === 'arrived' ? 'Marking…' : 'Arrived'}
-              </button>
-            )}
-
-            {/* Start ride button — only after arrived */}
-            {tripStatus === 'rider_arrived' && (
-              <button
-                onClick={handleStartRide}
-                disabled={!!actionLoading}
-                style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.35)', borderRadius: '12px', padding: '9px 14px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}
-              >
-                <Navigation size={13} /> {actionLoading === 'start' ? 'Starting…' : 'Start Ride'}
-              </button>
-            )}
-
-            {/* Complete button — only when in progress */}
-            {tripStatus === 'in_progress' && (
-              <button
-                onClick={handleCompleteRide}
-                disabled={!!actionLoading}
-                style={{ background: '#6B9E72', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
-              >
-                {actionLoading === 'complete' ? 'Completing…' : 'Complete ✓'}
-              </button>
-            )}
-
-            {/* Driver Cancel button */}
-            <button
-              onClick={handleDriverCancelRide}
-              disabled={!!actionLoading}
-              style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '12px', padding: '9px 12px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: actionLoading ? 0.6 : 1 }}
-            >
-              <X size={13} /> Cancel
-            </button>
-          </div>
-        </div>
-      )}
+        )
+      })()}
 
       {/* Driver In-App Chat Modal */}
       <AnimatePresence>
@@ -1191,6 +1265,143 @@ export default function EmployeeDashboard() {
             partnerName={activeTrip.customerName}
             onClose={() => setShowDriverChat(false)}
           />
+        )}
+      </AnimatePresence>
+
+      {/* Driver PIN Entry Modal for Ride Verification */}
+      <AnimatePresence>
+        {showPinModal && activeTrip && (
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              background: 'rgba(0, 0, 0, 0.75)',
+              backdropFilter: 'blur(6px)',
+              zIndex: 1000,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '16px',
+            }}
+            onClick={() => setShowPinModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ duration: 0.2 }}
+              style={{
+                background: '#1A1A1A',
+                border: '1px solid rgba(107, 158, 114, 0.35)',
+                borderRadius: '24px',
+                padding: '28px',
+                maxWidth: '420px',
+                width: '100%',
+                boxShadow: '0 24px 60px rgba(0,0,0,0.6)',
+                color: '#F5F0E8',
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: 'rgba(107, 158, 114, 0.15)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B9E72' }}>
+                    <KeyRound size={20} />
+                  </div>
+                  <div>
+                    <h3 style={{ margin: 0, fontSize: '17px', fontWeight: 800 }}>Verify Rider PIN</h3>
+                    <p style={{ margin: 0, fontSize: '12px', color: 'rgba(245,240,232,0.6)' }}>Ask passenger for 4-digit start code</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowPinModal(false)}
+                  style={{ background: 'transparent', border: 'none', color: 'rgba(245,240,232,0.5)', cursor: 'pointer', padding: '4px' }}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={handleVerifyPinAndStart}>
+                <p style={{ fontSize: '13px', lineHeight: 1.5, color: 'rgba(245,240,232,0.75)', marginBottom: '16px' }}>
+                  Please ask <strong>{activeTrip.customerName || 'the passenger'}</strong> for the 4-digit ride-start PIN displayed on their screen to begin the trip.
+                </p>
+
+                <div style={{ marginBottom: '16px' }}>
+                  <input
+                    type="text"
+                    maxLength={4}
+                    value={enteredPin}
+                    onChange={(e) => {
+                      setEnteredPin(e.target.value.replace(/\D/g, ''))
+                      setPinError('')
+                    }}
+                    placeholder="••••"
+                    autoFocus
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      borderRadius: '14px',
+                      border: pinError ? '2px solid #ef4444' : '2px solid rgba(107, 158, 114, 0.4)',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      color: '#F5F0E8',
+                      fontSize: '28px',
+                      fontWeight: 800,
+                      letterSpacing: '12px',
+                      textAlign: 'center',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                  {pinError && (
+                    <div style={{ color: '#ef4444', fontSize: '12px', marginTop: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                      <AlertCircle size={14} /> {pinError}
+                    </div>
+                  )}
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                  <button
+                    type="button"
+                    onClick={() => setShowPinModal(false)}
+                    style={{
+                      flex: 1,
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: '1px solid rgba(255,255,255,0.1)',
+                      background: 'transparent',
+                      color: '#F5F0E8',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={actionLoading === 'start' || enteredPin.length !== 4}
+                    style={{
+                      flex: 2,
+                      padding: '12px',
+                      borderRadius: '12px',
+                      border: 'none',
+                      background: '#6B9E72',
+                      color: '#ffffff',
+                      fontWeight: 800,
+                      fontSize: '13px',
+                      cursor: (enteredPin.length === 4 && !actionLoading) ? 'pointer' : 'not-allowed',
+                      opacity: (enteredPin.length === 4 && !actionLoading) ? 1 : 0.6,
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '6px',
+                    }}
+                  >
+                    {actionLoading === 'start' ? 'Verifying…' : 'Verify & Start Ride'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
