@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Link, useNavigate, useLocation } from 'react-router-dom'
-import { User, LogOut } from 'lucide-react'
+import { User, LogOut, Car } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
 import NotificationBell from './NotificationBell'
 import './Navbar.css'
@@ -25,7 +25,7 @@ export default function Navbar() {
 
   const navigate = useNavigate()
   const location = useLocation()
-  const { isAuthenticated, logout } = useAuth()
+  const { isAuthenticated, user, logout } = useAuth()
 
   const handleNav = (href: string) => {
     setMenuOpen(false)
@@ -57,6 +57,19 @@ export default function Navbar() {
               Book a Ride
             </Link>
           </li>
+          {isAuthenticated && (
+            <li>
+              <Link
+                className="nav-login"
+                to={user?.role === 'employee' ? '/employee-dashboard' : '/dashboard'}
+                onClick={() => setMenuOpen(false)}
+                style={{ color: '#6B9E72', textDecoration: 'none' }}
+              >
+                <Car size={14} />
+                <span>{user?.role === 'employee' ? 'Driver Portal' : 'My Rides'}</span>
+              </Link>
+            </li>
+          )}
           {isAuthenticated && (
             <li style={{ display: 'flex', alignItems: 'center' }}>
               <NotificationBell />

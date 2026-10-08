@@ -8,6 +8,8 @@ import DeliverParcel from './pages/DeliverParcel'
 import ParcelForm from './pages/ParcelForm'
 import EmployeeForm from './pages/EmployeeForm'
 import EmployeeDashboard from './pages/EmployeeDashboard'
+import UserDashboard from './pages/UserDashboard'
+import RideStatus from './pages/RideStatus'
 import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -25,7 +27,7 @@ export default function App() {
   const location = useLocation()
   const hideNavFooter = [
     '/login', '/register', '/parcel-form',
-    '/employee-form', '/employee-dashboard',
+    '/employee-form', '/employee-dashboard', '/dashboard',
   ].includes(location.pathname)
 
   return (
@@ -43,6 +45,26 @@ export default function App() {
             <Route path="/deliver"     element={<DeliverParcel />} />
             <Route path="/parcel-form" element={<ParcelForm />} />
             <Route path="/employee-form" element={<EmployeeForm />} />
+
+            {/* Protected: only authenticated users */}
+            <Route
+              path="/dashboard"
+              element={
+                <ProtectedRoute allowedRoles={['user', 'admin']}>
+                  <UserDashboard />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Protected: live ride status tracking */}
+            <Route
+              path="/ride-status/:rideId"
+              element={
+                <ProtectedRoute allowedRoles={['user', 'admin']}>
+                  <RideStatus />
+                </ProtectedRoute>
+              }
+            />
 
             {/* Protected: only authenticated employees/admins */}
             <Route

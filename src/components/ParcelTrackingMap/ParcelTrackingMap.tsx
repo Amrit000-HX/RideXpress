@@ -4,15 +4,15 @@
  * Stack: Leaflet.js · OpenStreetMap · OSRM Road Routing
  * Palette: Cream #F5F0E8 · Sage-Green #6B9E72 · Charcoal #1A1A1A
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { MapContainer, TileLayer, Marker, Polyline, useMap } from 'react-leaflet'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
-import { motion, AnimatePresence } from 'framer-motion'
+import { AnimatePresence } from 'framer-motion'
 import {
-  Package, MapPin, Truck, Phone, Star, Shield,
-  ArrowLeft, CheckCircle2, Copy, Check, MessageSquare,
-  Navigation, Clock, KeyRound, ExternalLink,
+  Phone, Star,
+  ArrowLeft, Copy, Check, MessageSquare,
+  Clock, KeyRound,
 } from 'lucide-react'
 import ChatBox from '../ChatBox'
 import './ParcelTrackingMap.css'

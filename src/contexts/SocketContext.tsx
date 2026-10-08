@@ -20,7 +20,7 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const [isConnected, setIsConnected] = useState(false)
 
   useEffect(() => {
-    if (isAuthenticated && token && token !== 'legacy') {
+    if (isAuthenticated && token && token !== 'legacy' && token.split('.').length === 3) {
       const s = connectSocket(token)
       setSocket(s)
 

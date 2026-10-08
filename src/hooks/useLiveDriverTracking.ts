@@ -113,21 +113,35 @@ export function useLiveDriverTracking(activeRideId?: string | null) {
     // Request active fleet on connect
     socket.emit('fleet:get_nearby')
 
-    const handleNearbyList = (data: { drivers: NearbyDriver[] }) => {
+    const handleNearbyList = (data: { drivers: any[] }) => {
       if (data?.drivers) {
-        setNearbyDrivers(data.drivers)
+        const normalized = data.drivers.map((d: any) => ({
+          ...d,
+          id: String(d.id || d.driverId || ''),
+        }))
+        setNearbyDrivers(normalized)
       }
     }
 
-    const handleSingleDriverUpdate = (driver: NearbyDriver) => {
+    const handleSingleDriverUpdate = (driver: any) => {
+      const driverId = String(driver.id || driver.driverId || '')
+      if (!driverId) return
+      const normalized: NearbyDriver = {
+        id: driverId,
+        vehicleType: driver.vehicleType,
+        lat: Number(driver.lat),
+        lng: Number(driver.lng),
+        heading: Number(driver.heading) || 0,
+        isAvailable: driver.isAvailable !== false,
+      }
       setNearbyDrivers((prev) => {
-        const existingIdx = prev.findIndex((d) => d.id === driver.id)
+        const existingIdx = prev.findIndex((d) => d.id === driverId)
         if (existingIdx >= 0) {
           const updated = [...prev]
-          updated[existingIdx] = driver
+          updated[existingIdx] = normalized
           return updated
         }
-        return [...prev, driver]
+        return [...prev, normalized]
       })
     }
 

@@ -13,9 +13,22 @@ import {
   ArrowRight, MapPin, Zap, LogOut, Truck, ChevronRight,
   BarChart3, Navigation, Timer, CalendarDays,
   CircleDot, ArrowUpRight, Wallet, BadgeAlert,
-  CheckCircle2, X, Phone, User, Check, KeyRound, MessageSquare,
+  X, Check, MessageSquare,
 } from 'lucide-react'
-import { acceptRideBooking, completeRideBooking, getDriverRideHistory } from '../services/rideService'
+import {
+  acceptRideBooking,
+  rejectRideBooking,
+  cancelRideBooking,
+  markDriverArrived,
+  startRideBooking,
+  completeRideBooking,
+  getDriverRideHistory,
+  getDriverActiveRide,
+  getAvailableRides,
+  setDriverOnlineStatus,
+  getDriverOnlineStatus,
+  updateDriverLocation,
+} from '../services/rideService'
 import ChatBox from '../components/ChatBox'
 import './EmployeeDashboard.css'
 
@@ -240,9 +253,17 @@ function StatusTabs() {
 }
 
 /* ════════════════════════════════════════════
-   SECTION: UPCOMING RIDES
+   SECTION: UPCOMING RIDES (Live Database & Socket Dispatch Feed)
    ════════════════════════════════════════════ */
-function UpcomingRides() {
+function UpcomingRides({
+  rides = [],
+  onAccept,
+  loadingId,
+}: {
+  rides?: any[]
+  onAccept: (rideId: string) => void
+  loadingId: string | null
+}) {
   return (
     <motion.div
       className="ed-card"
@@ -258,34 +279,56 @@ function UpcomingRides() {
       </div>
 
       <div className="ed-upcoming-list">
-        {UPCOMING_RIDES.map((r, i) => (
-          <motion.div
-            key={r.id}
-            className="ed-upcoming-card"
-            initial={{ opacity: 0, scale: 0.96 }} whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }} transition={{ duration: 0.45, delay: i * 0.07 }}
-            whileHover={{ borderColor: 'rgba(107,158,114,0.35)' }}
-          >
-            <div className="ed-upcoming-left">
-              <div className="ed-upcoming-route">
-                <MapPin size={11} className="ed-green" /> {r.from}
-              </div>
-              <div className="ed-upcoming-arrow">↓</div>
-              <div className="ed-upcoming-route">
-                <MapPin size={11} className="ed-cream" /> {r.to}
-              </div>
-            </div>
-            <div className="ed-upcoming-mid">
-              <span className="ed-upcoming-dist">{r.distance}</span>
-              <span className="ed-upcoming-pax">{r.passengers} pax</span>
-              <span className="ed-upcoming-time">{r.timeLabel}</span>
-            </div>
-            <div className="ed-upcoming-right">
-              <span className="ed-upcoming-fare">₹{r.earning}</span>
-              <button className="ed-accept-btn">Accept <ChevronRight size={12} /></button>
-            </div>
-          </motion.div>
-        ))}
+        {rides.length === 0 ? (
+          <div style={{ padding: '24px 12px', textAlign: 'center', color: 'rgba(245,240,232,0.45)', fontSize: '13px' }}>
+            No pending ride requests at this moment. Bring your shift online to receive nearby passenger bookings.
+          </div>
+        ) : (
+          rides.map((r) => {
+            const rId = r.rideId || r._id || r.id
+            const fromAddr = r.pickup?.address || r.from || 'Pickup point'
+            const toAddr = r.drop?.address || r.to || 'Drop destination'
+            const fare = r.estimatedFare || r.earning || 250
+            const dist = r.distanceKm ? `${r.distanceKm} km` : (r.distance || '5.2 km')
+            const pax = r.passengers || 1
+            const time = r.timeLabel || 'Immediate'
+
+            return (
+              <motion.div
+                key={rId}
+                className="ed-upcoming-card"
+                initial={{ opacity: 0, scale: 0.96 }}
+                animate={{ opacity: 1, scale: 1 }}
+                whileHover={{ borderColor: 'rgba(107,158,114,0.35)' }}
+              >
+                <div className="ed-upcoming-left">
+                  <div className="ed-upcoming-route">
+                    <MapPin size={11} className="ed-green" /> {fromAddr.slice(0, 32)}
+                  </div>
+                  <div className="ed-upcoming-arrow">↓</div>
+                  <div className="ed-upcoming-route">
+                    <MapPin size={11} className="ed-cream" /> {toAddr.slice(0, 32)}
+                  </div>
+                </div>
+                <div className="ed-upcoming-mid">
+                  <span className="ed-upcoming-dist">{dist}</span>
+                  <span className="ed-upcoming-pax">{pax} pax</span>
+                  <span className="ed-upcoming-time">{time}</span>
+                </div>
+                <div className="ed-upcoming-right">
+                  <span className="ed-upcoming-fare">₹{fare}</span>
+                  <button
+                    className="ed-accept-btn"
+                    onClick={() => onAccept(rId)}
+                    disabled={loadingId === 'accept'}
+                  >
+                    {loadingId === 'accept' ? '…' : <>Accept <ChevronRight size={12} /></>}
+                  </button>
+                </div>
+              </motion.div>
+            )
+          })
+        )}
       </div>
     </motion.div>
   )
@@ -294,79 +337,25 @@ function UpcomingRides() {
 /* ════════════════════════════════════════════
    SIDEBAR: CURRENT SHIFT & LIVE GPS BROADCASTER
    ════════════════════════════════════════════ */
-function ShiftCard({ vehicleCategory = 'Scooty' }: { vehicleCategory?: string }) {
-  const { socket, isConnected } = useSocket()
-  const [isOnline, setIsOnline] = useState(false)
-  const [gpsCoords, setGpsCoords] = useState<{ lat: number; lng: number } | null>(null)
-  const [pingCount, setPingCount] = useState(0)
-  const watchIdRef = useRef<number | null>(null)
-  const simIntervalRef = useRef<NodeJS.Timeout | null>(null)
-
+function ShiftCard({
+  vehicleCategory = 'Scooty',
+  isOnline,
+  onToggleOnline,
+  onlineLoading,
+  gpsCoords,
+  pingCount,
+}: {
+  vehicleCategory?: string
+  isOnline: boolean
+  onToggleOnline: () => void
+  onlineLoading: boolean
+  gpsCoords: { lat: number; lng: number } | null
+  pingCount: number
+}) {
+  const { isConnected } = useSocket()
   const hoursWorked = isOnline ? 7.2 : 6.5
   const totalHours = 12
   const pct = (hoursWorked / totalHours) * 100
-
-  // Toggle Live Shift & GPS broadcasting
-  const toggleOnline = () => {
-    if (isOnline) {
-      // Go Offline
-      if (watchIdRef.current !== null) {
-        navigator.geolocation.clearWatch(watchIdRef.current)
-        watchIdRef.current = null
-      }
-      if (simIntervalRef.current) {
-        clearInterval(simIntervalRef.current)
-        simIntervalRef.current = null
-      }
-      socket?.emit('driver:go_offline')
-      setIsOnline(false)
-      setGpsCoords(null)
-    } else {
-      // Go Online
-      socket?.emit('driver:go_online', { vehicleType: vehicleCategory })
-      setIsOnline(true)
-
-      // 1. Try real GPS via navigator.geolocation
-      if ('geolocation' in navigator) {
-        watchIdRef.current = navigator.geolocation.watchPosition(
-          (pos) => {
-            const lat = pos.coords.latitude
-            const lng = pos.coords.longitude
-            const heading = pos.coords.heading || 0
-            const speed = pos.coords.speed || 0
-            setGpsCoords({ lat, lng })
-            setPingCount((p) => p + 1)
-
-            socket?.emit('driver:location_update', {
-              lat,
-              lng,
-              heading,
-              speed,
-            })
-          },
-          (err) => {
-            console.warn('GPS hardware access note:', err.message, '- starting smooth simulator fallback')
-            // Simulator fallback (e.g. if running on desktop or inside restricted iframe)
-            let baseLat = 19.0760
-            let baseLng = 72.8777
-            simIntervalRef.current = setInterval(() => {
-              baseLat += (Math.random() - 0.5) * 0.0005
-              baseLng += (Math.random() - 0.5) * 0.0005
-              setGpsCoords({ lat: baseLat, lng: baseLng })
-              setPingCount((p) => p + 1)
-              socket?.emit('driver:location_update', {
-                lat: baseLat,
-                lng: baseLng,
-                heading: Math.floor(Math.random() * 360),
-                speed: 35,
-              })
-            }, 3000)
-          },
-          { enableHighAccuracy: true, timeout: 8000, maximumAge: 0 }
-        )
-      }
-    }
-  }
 
   return (
     <motion.div
@@ -380,7 +369,8 @@ function ShiftCard({ vehicleCategory = 'Scooty' }: { vehicleCategory?: string })
           <h3 className="ed-card-title">Live Shift &amp; GPS</h3>
         </div>
         <button
-          onClick={toggleOnline}
+          onClick={onToggleOnline}
+          disabled={onlineLoading}
           style={{
             background: isOnline ? '#6B9E72' : '#2a2a2a',
             color: isOnline ? '#ffffff' : '#e0e0e0',
@@ -389,7 +379,7 @@ function ShiftCard({ vehicleCategory = 'Scooty' }: { vehicleCategory?: string })
             padding: '6px 14px',
             fontSize: '12px',
             fontWeight: 700,
-            cursor: 'pointer',
+            cursor: onlineLoading ? 'not-allowed' : 'pointer',
             display: 'inline-flex',
             alignItems: 'center',
             gap: '6px',
@@ -405,7 +395,7 @@ function ShiftCard({ vehicleCategory = 'Scooty' }: { vehicleCategory?: string })
               boxShadow: isOnline ? '0 0 8px #ffffff' : 'none',
             }}
           />
-          {isOnline ? 'ONLINE (Broadcasting)' : 'GO ONLINE'}
+          {onlineLoading ? 'Updating…' : isOnline ? 'ONLINE (Broadcasting)' : 'GO ONLINE'}
         </button>
       </div>
 
@@ -569,7 +559,19 @@ function PriorityQueue() {
 /* ════════════════════════════════════════════
    SECTION: COMPLETED RIDES (horizontal scroll)
    ════════════════════════════════════════════ */
-function CompletedRidesSection() {
+function CompletedRidesSection({ rides = [] }: { rides?: any[] }) {
+  const displayRides = rides.length > 0
+    ? rides.map(r => ({
+        id: r.bookingId || r._id,
+        from: r.pickup?.address?.slice(0, 24) || 'Pickup',
+        to: r.drop?.address?.slice(0, 24) || 'Drop',
+        date: new Date(r.completedAt || r.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        duration: `${r.estimatedMinutes || 15} min`,
+        earning: r.actualFare || r.estimatedFare || 250,
+        rating: r.driverRating || 5,
+      }))
+    : COMPLETED_RIDES_FULL
+
   return (
     <motion.section
       className="ed-completed-section"
@@ -585,7 +587,7 @@ function CompletedRidesSection() {
       </div>
 
       <div className="ed-completed-scroll">
-        {COMPLETED_RIDES_FULL.map((r, i) => (
+        {displayRides.map((r, i) => (
           <motion.div
             key={r.id}
             className="ed-completed-card"
@@ -643,6 +645,14 @@ export default function EmployeeDashboard() {
   const [showDriverChat, setShowDriverChat]   = useState(false)
   const [driverRides, setDriverRides]         = useState<any[]>([])
   const [dbEarnings, setDbEarnings]           = useState<number>(0)
+  const [tripStatus, setTripStatus]           = useState<string>('assigned')
+  const [actionLoading, setActionLoading]     = useState<string | null>(null)
+  const [isOnline, setIsOnline]               = useState<boolean>(false)
+  const [onlineLoading, setOnlineLoading]     = useState<boolean>(false)
+  const [availableRides, setAvailableRides]   = useState<any[]>([])
+  const [gpsCoords, setGpsCoords]             = useState<{ lat: number; lng: number } | null>(null)
+  const [pingCount, setPingCount]             = useState<number>(0)
+  const savedDriverCoordsRef                  = useRef<{ lat: number; lng: number } | null>(null)
 
   const loadDriverHistory = async () => {
     try {
@@ -656,23 +666,95 @@ export default function EmployeeDashboard() {
     }
   }
 
+  const loadActiveTrip = async () => {
+    try {
+      const ride = await getDriverActiveRide()
+      if (ride) {
+        setActiveTrip(ride)
+        setTripStatus(ride.status)
+      }
+    } catch (err) {
+      console.warn('Could not load active trip:', err)
+    }
+  }
+
   useEffect(() => {
     loadDriverHistory()
+    loadActiveTrip()
+    // Load persisted online status & saved location from DB — source of truth
+    getDriverOnlineStatus().then((data) => {
+      setIsOnline(data.onlineStatus === 'ONLINE')
+      const lat = data.currentLocation?.lat ?? data.location?.coordinates?.[1]
+      const lng = data.currentLocation?.lng ?? data.location?.coordinates?.[0]
+      if (lat != null && lng != null) {
+        savedDriverCoordsRef.current = { lat, lng }
+        setGpsCoords({ lat, lng })
+      }
+    }).catch(() => {})
+
+    getAvailableRides().then((rides) => {
+      if (Array.isArray(rides)) setAvailableRides(rides)
+    }).catch(() => {})
   }, [])
 
-  // Listen for real-time ride matching requests from customers
+  // Listen for real-time ride matching requests from customers & unavailable broadcasts
   useEffect(() => {
     if (!socket || !isConnected) return
 
     const handleIncomingRequest = (data: any) => {
       setIncomingRequest(data)
       setAcceptTimer(30)
+      setAvailableRides((prev) => {
+        const reqId = data.rideId || data._id
+        if (prev.some((r) => (r.rideId === reqId || r._id === reqId))) return prev
+        return [data, ...prev]
+      })
+    }
+
+    const handleNewAvailable = (data: any) => {
+      setAvailableRides((prev) => {
+        const reqId = data.rideId || data._id
+        if (prev.some((r) => (r.rideId === reqId || r._id === reqId))) return prev
+        return [data, ...prev]
+      })
+    }
+
+    const handleRideUnavailable = (data: any) => {
+      const uId = data?.rideId
+      setIncomingRequest((prev: any) => {
+        if (!prev) return null
+        if (uId && (String(uId) === String(prev.rideId) || String(uId) === String(prev._id))) {
+          return null
+        }
+        return prev
+      })
+      if (uId) {
+        setAvailableRides((prev) => prev.filter((r) => String(r.rideId || r._id) !== String(uId)))
+      }
+    }
+
+    const handleDriverAssignedRide = (ride: any) => {
+      setActiveTrip(ride)
+      setTripStatus(ride.status || 'assigned')
+      setIncomingRequest(null)
+      const rId = ride._id || ride.rideId
+      if (rId) {
+        setAvailableRides((prev) => prev.filter((r) => String(r.rideId || r._id) !== String(rId)))
+        socket.emit('ride:join_room', { rideId: rId })
+      }
+      loadDriverHistory()
     }
 
     socket.on('ride:incoming_request', handleIncomingRequest)
+    socket.on('ride:new_available', handleNewAvailable)
+    socket.on('ride:unavailable', handleRideUnavailable)
+    socket.on('driver:assigned_ride', handleDriverAssignedRide)
 
     return () => {
       socket.off('ride:incoming_request', handleIncomingRequest)
+      socket.off('ride:new_available', handleNewAvailable)
+      socket.off('ride:unavailable', handleRideUnavailable)
+      socket.off('driver:assigned_ride', handleDriverAssignedRide)
     }
   }, [socket, isConnected])
 
@@ -691,27 +773,207 @@ export default function EmployeeDashboard() {
     return () => clearInterval(interval)
   }, [incomingRequest])
 
-  const handleAcceptRide = async () => {
-    if (!incomingRequest) return
+  // ── GPS Polling Loop ──────────────────────────────────────────────────
+  // Runs when driver is ONLINE + socket is connected.
+  // Uses saved MongoDB coordinates as base to avoid jumping across the map.
+  // ──────────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!isOnline || !socket || !isConnected) return
+
+    let watchId:       number | null = null
+    let tickInterval:  ReturnType<typeof setInterval> | null = null
+    let tick           = 0
+    let latestLat      = savedDriverCoordsRef.current?.lat || 0
+    let latestLng      = savedDriverCoordsRef.current?.lng || 0
+    let hasGeoFix      = false
+
+    const pushLocation = (lat: number, lng: number, heading = 0, speed = 0) => {
+      latestLat = lat
+      latestLng = lng
+      setGpsCoords({ lat, lng })
+      setPingCount((p) => p + 1)
+
+      // Primary: emit socket event (5 s interval)
+      socket.emit('driver:location_update', {
+        lat, lng, heading, speed,
+        activeRideId: activeTrip?._id || activeTrip?.rideId || null,
+      })
+
+      // Fallback: REST call every 10 s (every 2nd tick) — persists even if socket drops
+      tick++
+      if (tick % 2 === 0) {
+        updateDriverLocation(lat, lng, heading, speed).catch(() => {})
+      }
+    }
+
+    if ('geolocation' in navigator) {
+      // Real GPS — watch for continuous updates
+      watchId = navigator.geolocation.watchPosition(
+        (pos) => {
+          hasGeoFix = true
+          pushLocation(
+            pos.coords.latitude,
+            pos.coords.longitude,
+            pos.coords.heading ?? 0,
+            pos.coords.speed   ?? 0,
+          )
+        },
+        () => { /* simulator fallback below */ },
+        { enableHighAccuracy: true, maximumAge: 5000, timeout: 8000 },
+      )
+    }
+
+    // Initial push immediately on coming online
+    if (latestLat !== 0) {
+      pushLocation(latestLat, latestLng)
+    }
+
+    // Tick every 5 s
+    tickInterval = setInterval(() => {
+      if (hasGeoFix && latestLat !== 0) {
+        pushLocation(latestLat, latestLng)
+      } else {
+        // Use saved driver coordinates with small realistic drift (~10m)
+        if (latestLat === 0) {
+          latestLat = savedDriverCoordsRef.current?.lat || 19.0733
+          latestLng = savedDriverCoordsRef.current?.lng || 83.8130
+        }
+        latestLat += (Math.random() - 0.5) * 0.0001
+        latestLng += (Math.random() - 0.5) * 0.0001
+        pushLocation(latestLat, latestLng)
+      }
+    }, 5000)
+
+    return () => {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId)
+      if (tickInterval)     clearInterval(tickInterval)
+    }
+  }, [isOnline, socket, isConnected, activeTrip?._id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleAcceptRide = async (rideIdToAccept?: string) => {
+    const rId = rideIdToAccept || incomingRequest?.rideId || incomingRequest?._id
+    if (!rId) return
+    setActionLoading('accept')
     try {
-      await acceptRideBooking(incomingRequest.rideId)
-      setActiveTrip(incomingRequest)
+      const res = await acceptRideBooking(rId)
+      const rideData = res?.ride || incomingRequest || { _id: rId, rideId: rId, status: 'assigned' }
+      setActiveTrip({ ...rideData, status: 'assigned' })
+      setTripStatus('assigned')
       setIncomingRequest(null)
-      socket?.emit('ride:join_room', { rideId: incomingRequest.rideId })
-    } catch (err) {
+      setAvailableRides((prev) => prev.filter((r) => String(r.rideId || r._id) !== String(rId)))
+      socket?.emit('ride:join_room', { rideId: rId })
+    } catch (err: any) {
       console.error('Failed to accept ride:', err)
+      const msg = err?.response?.data?.message || err?.message || 'This ride is no longer available or was accepted by another driver.'
+      alert(msg)
+      setIncomingRequest(null)
+      setAvailableRides((prev) => prev.filter((r) => String(r.rideId || r._id) !== String(rId)))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleRejectRide = async () => {
+    if (!incomingRequest) return
+    const rId = incomingRequest.rideId || incomingRequest._id
+    setActionLoading('reject')
+    try {
+      await rejectRideBooking(rId)
+      setIncomingRequest(null)
+      setAvailableRides((prev) => prev.filter((r) => String(r.rideId || r._id) !== String(rId)))
+    } catch (err) {
+      console.error('Failed to reject ride:', err)
+      setIncomingRequest(null)
+      setAvailableRides((prev) => prev.filter((r) => String(r.rideId || r._id) !== String(rId)))
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleMarkArrived = async () => {
+    if (!activeTrip) return
+    setActionLoading('arrived')
+    try {
+      await markDriverArrived(activeTrip.rideId || activeTrip._id)
+      setTripStatus('rider_arrived')
+      setActiveTrip((prev: any) => ({ ...prev, status: 'rider_arrived' }))
+    } catch (err) {
+      console.error('Failed to mark arrived:', err)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleStartRide = async () => {
+    if (!activeTrip) return
+    setActionLoading('start')
+    try {
+      await startRideBooking(activeTrip.rideId || activeTrip._id)
+      setTripStatus('in_progress')
+      setActiveTrip((prev: any) => ({ ...prev, status: 'in_progress' }))
+    } catch (err) {
+      console.error('Failed to start ride:', err)
+    } finally {
+      setActionLoading(null)
     }
   }
 
   const handleCompleteRide = async () => {
     if (!activeTrip) return
+    setActionLoading('complete')
     try {
-      await completeRideBooking(activeTrip.rideId)
+      await completeRideBooking(activeTrip.rideId || activeTrip._id)
       setActiveTrip(null)
+      setTripStatus('assigned')
       setShowDriverChat(false)
       loadDriverHistory()
     } catch (err) {
       console.error('Failed to complete ride:', err)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleDriverCancelRide = async () => {
+    if (!activeTrip) return
+    const reason = window.prompt('Please enter a cancellation reason (e.g. Passenger no-show):', 'Passenger no-show')
+    if (reason === null) return
+    setActionLoading('cancel')
+    try {
+      await cancelRideBooking(activeTrip.rideId || activeTrip._id, reason || 'Driver cancelled')
+      setActiveTrip(null)
+      setShowDriverChat(false)
+      loadDriverHistory()
+    } catch (err) {
+      console.error('Failed to cancel trip:', err)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  const handleGoOnline = async () => {
+    setOnlineLoading(true)
+    try {
+      await setDriverOnlineStatus('ONLINE')
+      setIsOnline(true)
+      socket?.emit('driver:go_online', { vehicleType: empVehicle })
+    } catch (err) {
+      console.error('Failed to go online:', err)
+    } finally {
+      setOnlineLoading(false)
+    }
+  }
+
+  const handleGoOffline = async () => {
+    setOnlineLoading(true)
+    try {
+      await setDriverOnlineStatus('OFFLINE')
+      setIsOnline(false)
+      socket?.emit('driver:go_offline')
+    } catch (err) {
+      console.error('Failed to go offline:', err)
+    } finally {
+      setOnlineLoading(false)
     }
   }
 
@@ -815,16 +1077,18 @@ export default function EmployeeDashboard() {
               {/* Actions */}
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '12px' }}>
                 <button
-                  onClick={() => setIncomingRequest(null)}
-                  style={{ padding: '14px', background: 'rgba(255,255,255,0.08)', color: '#F5F0E8', border: 'none', borderRadius: '14px', fontWeight: 700, cursor: 'pointer' }}
+                  onClick={handleRejectRide}
+                  disabled={actionLoading === 'reject' || actionLoading === 'accept'}
+                  style={{ padding: '14px', background: 'rgba(239,68,68,0.1)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.25)', borderRadius: '14px', fontWeight: 700, cursor: 'pointer', opacity: actionLoading ? 0.7 : 1 }}
                 >
-                  Decline
+                  {actionLoading === 'reject' ? '…' : 'Reject'}
                 </button>
                 <button
                   onClick={handleAcceptRide}
-                  style={{ padding: '14px', background: '#6B9E72', color: '#ffffff', border: 'none', borderRadius: '14px', fontWeight: 800, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(107, 158, 114, 0.4)' }}
+                  disabled={actionLoading === 'accept' || actionLoading === 'reject'}
+                  style={{ padding: '14px', background: '#6B9E72', color: '#ffffff', border: 'none', borderRadius: '14px', fontWeight: 800, fontSize: '15px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', boxShadow: '0 8px 24px rgba(107, 158, 114, 0.4)', opacity: actionLoading ? 0.7 : 1 }}
                 >
-                  <Check size={18} strokeWidth={3} /> ACCEPT RIDE
+                  <Check size={18} strokeWidth={3} /> {actionLoading === 'accept' ? 'Accepting…' : 'ACCEPT RIDE'}
                 </button>
               </div>
             </motion.div>
@@ -850,7 +1114,7 @@ export default function EmployeeDashboard() {
               </div>
             </div>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             <button
               onClick={() => setShowDriverChat((prev) => !prev)}
               style={{
@@ -858,23 +1122,59 @@ export default function EmployeeDashboard() {
                 border: '1px solid rgba(107, 158, 114, 0.4)',
                 color: '#F5F0E8',
                 borderRadius: '12px',
-                padding: '10px 16px',
+                padding: '9px 14px',
                 fontWeight: 700,
-                fontSize: '13px',
+                fontSize: '12px',
                 cursor: 'pointer',
                 display: 'flex',
                 alignItems: 'center',
                 gap: '6px',
               }}
             >
-              <MessageSquare size={15} />
-              <span>{showDriverChat ? 'Close Chat' : 'Chat with Passenger'}</span>
+              <MessageSquare size={14} />
+              <span>{showDriverChat ? 'Close Chat' : 'Chat'}</span>
             </button>
+
+            {/* Arrived at pickup button — only when not yet arrived */}
+            {(tripStatus === 'assigned' || tripStatus === 'rider_arriving') && (
+              <button
+                onClick={handleMarkArrived}
+                disabled={!!actionLoading}
+                style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.35)', borderRadius: '12px', padding: '9px 14px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <MapPin size={13} /> {actionLoading === 'arrived' ? 'Marking…' : 'Arrived'}
+              </button>
+            )}
+
+            {/* Start ride button — only after arrived */}
+            {tripStatus === 'rider_arrived' && (
+              <button
+                onClick={handleStartRide}
+                disabled={!!actionLoading}
+                style={{ background: 'rgba(59,130,246,0.15)', color: '#3b82f6', border: '1px solid rgba(59,130,246,0.35)', borderRadius: '12px', padding: '9px 14px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1, display: 'flex', alignItems: 'center', gap: '5px' }}
+              >
+                <Navigation size={13} /> {actionLoading === 'start' ? 'Starting…' : 'Start Ride'}
+              </button>
+            )}
+
+            {/* Complete button — only when in progress */}
+            {tripStatus === 'in_progress' && (
+              <button
+                onClick={handleCompleteRide}
+                disabled={!!actionLoading}
+                style={{ background: '#6B9E72', color: '#fff', border: 'none', borderRadius: '12px', padding: '9px 16px', fontWeight: 800, fontSize: '12px', cursor: 'pointer', opacity: actionLoading ? 0.6 : 1 }}
+              >
+                {actionLoading === 'complete' ? 'Completing…' : 'Complete ✓'}
+              </button>
+            )}
+
+            {/* Driver Cancel button */}
             <button
-              onClick={handleCompleteRide}
-              style={{ background: '#6B9E72', color: '#fff', border: 'none', borderRadius: '12px', padding: '10px 18px', fontWeight: 800, fontSize: '13px', cursor: 'pointer' }}
+              onClick={handleDriverCancelRide}
+              disabled={!!actionLoading}
+              style={{ background: 'rgba(239,68,68,0.15)', color: '#ef4444', border: '1px solid rgba(239,68,68,0.35)', borderRadius: '12px', padding: '9px 12px', fontWeight: 700, fontSize: '12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', opacity: actionLoading ? 0.6 : 1 }}
             >
-              Complete Trip ✓
+              <X size={13} /> Cancel
             </button>
           </div>
         </div>
@@ -884,7 +1184,7 @@ export default function EmployeeDashboard() {
       <AnimatePresence>
         {showDriverChat && activeTrip && (
           <ChatBox
-            rideId={activeTrip.rideId}
+            rideId={activeTrip.rideId || activeTrip._id}
             currentUserId={user?.id || 'driver-1'}
             currentUserName={empName}
             currentUserRole="driver"
@@ -970,7 +1270,7 @@ export default function EmployeeDashboard() {
               { icon: Star,       value: '4.8',            label: 'Rating' },
               { icon: BarChart3,  value: '1,247',          label: 'Total Trips' },
               { icon: Wallet,     value: `₹${todayEarnings}`, label: "Today's Earnings" },
-              { icon: CircleDot,  value: 'Active',         label: 'Shift Status' },
+              { icon: CircleDot,  value: isOnline ? 'Online' : 'Offline', label: 'Shift Status' },
             ].map(({ icon: Icon, value, label }, i) => (
               <motion.div
                 key={label}
@@ -987,6 +1287,67 @@ export default function EmployeeDashboard() {
               </motion.div>
             ))}
           </motion.div>
+        </motion.div>
+
+        {/* ── Go Online / Offline Toggle ── */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, delay: 0.6 }}
+          style={{ display: 'flex', justifyContent: 'center', paddingBottom: '32px', gap: '12px' }}
+        >
+          {isOnline ? (
+            <button
+              onClick={handleGoOffline}
+              disabled={onlineLoading}
+              style={{
+                background: 'rgba(239,68,68,0.15)',
+                border: '2px solid rgba(239,68,68,0.5)',
+                color: '#ef4444',
+                borderRadius: '50px',
+                padding: '12px 28px',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: onlineLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'all 0.2s',
+                letterSpacing: '0.5px',
+              }}
+            >
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#ef4444', display: 'inline-block' }} />
+              {onlineLoading ? 'Going Offline…' : 'Go Offline'}
+            </button>
+          ) : (
+            <button
+              onClick={handleGoOnline}
+              disabled={onlineLoading}
+              style={{
+                background: 'rgba(107,158,114,0.2)',
+                border: '2px solid #6B9E72',
+                color: '#6B9E72',
+                borderRadius: '50px',
+                padding: '12px 28px',
+                fontWeight: 800,
+                fontSize: '14px',
+                cursor: onlineLoading ? 'not-allowed' : 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 0 20px rgba(107,158,114,0.3)',
+                transition: 'all 0.2s',
+                letterSpacing: '0.5px',
+              }}
+            >
+              <span style={{ width: 10, height: 10, borderRadius: '50%', background: '#6B9E72', boxShadow: '0 0 8px #6B9E72', display: 'inline-block', animation: 'pulse 1.5s infinite' }} />
+              {onlineLoading ? 'Going Online…' : 'Go Online'}
+            </button>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: 'rgba(245,240,232,0.5)' }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: isConnected ? '#6B9E72' : '#ef4444', display: 'inline-block' }} />
+            {isConnected ? 'Socket Connected' : 'Reconnecting…'}
+          </div>
         </motion.div>
 
         {/* Scroll hint */}
@@ -1011,12 +1372,23 @@ export default function EmployeeDashboard() {
           <div className="ed-left">
             <TodayDeliveries />
             <StatusTabs />
-            <UpcomingRides />
+            <UpcomingRides
+              rides={availableRides}
+              onAccept={handleAcceptRide}
+              loadingId={actionLoading}
+            />
           </div>
 
           {/* RIGHT: sidebar (1/3) */}
           <div className="ed-right">
-            <ShiftCard vehicleCategory={empVehicle} />
+            <ShiftCard
+              vehicleCategory={empVehicle}
+              isOnline={isOnline}
+              onToggleOnline={isOnline ? handleGoOffline : handleGoOnline}
+              onlineLoading={onlineLoading}
+              gpsCoords={gpsCoords}
+              pingCount={pingCount}
+            />
             <NotificationsPanel />
             <PriorityQueue />
           </div>
@@ -1024,7 +1396,7 @@ export default function EmployeeDashboard() {
         </div>
 
         {/* FULL WIDTH: Completed Rides */}
-        <CompletedRidesSection />
+        <CompletedRidesSection rides={driverRides} />
       </main>
     </div>
   )

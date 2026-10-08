@@ -1,0 +1,734 @@
+/* ════════════════════════════════════════════════════════
+   RideStatus.css — Live Ride Status & Tracking Page
+   Palette: Cream #F5F0E8 · Sage #6B9E72 · Charcoal #1A1A1A · Red #ef4444
+   ════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+.rs-page {
+  min-height: 100vh;
+  background: #0f0f0f;
+  font-family: 'Outfit', sans-serif;
+  color: #F5F0E8;
+  padding: 32px 20px 80px;
+}
+
+.rs-container {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+/* ── Top Bar ────────────────────────────────────────── */
+.rs-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rs-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #F5F0E8;
+  padding: 8px 14px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rs-back-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  transform: translateX(-2px);
+}
+
+.rs-top-meta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rs-booking-pill {
+  font-family: monospace;
+  font-size: 13px;
+  color: rgba(245, 240, 232, 0.6);
+  background: rgba(255, 255, 255, 0.04);
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.rs-refresh-btn {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(245, 240, 232, 0.7);
+  padding: 7px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.rs-refresh-btn:hover {
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+/* ── Radar Scanner Hero (Searching stage) ───────────── */
+.rs-radar-card {
+  background: #1A1A1A;
+  border: 1px solid rgba(107, 158, 114, 0.3);
+  border-radius: 24px;
+  padding: 48px 24px 36px;
+  text-align: center;
+  margin-bottom: 24px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.rs-radar-animation {
+  position: relative;
+  width: 140px;
+  height: 140px;
+  margin: 0 auto 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rs-radar-center {
+  width: 52px;
+  height: 52px;
+  background: #6B9E72;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 0 24px rgba(107, 158, 114, 0.6);
+  z-index: 2;
+}
+
+.rs-radar-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid rgba(107, 158, 114, 0.4);
+  border-radius: 50%;
+  animation: rs-sonar 2.4s cubic-bezier(0.1, 0.2, 0.3, 1) infinite;
+}
+
+.rs-ring-2 {
+  animation-delay: 0.8s;
+}
+
+.rs-ring-3 {
+  animation-delay: 1.6s;
+}
+
+@keyframes rs-sonar {
+  0% {
+    transform: scale(0.35);
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+.rs-radar-title {
+  font-size: 24px;
+  font-weight: 800;
+  margin: 0 0 8px;
+}
+
+.rs-radar-sub {
+  font-size: 14px;
+  color: rgba(245, 240, 232, 0.6);
+  margin: 0 0 20px;
+  max-width: 440px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.rs-radar-timer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(107, 158, 114, 0.15);
+  border: 1px solid rgba(107, 158, 114, 0.35);
+  color: #c0dec4;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* ── Status Stage Card (Assigned, Arriving, Arrived, In Progress) ── */
+.rs-main-card {
+  background: #1A1A1A;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 24px;
+  padding: 28px;
+  margin-bottom: 24px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.4);
+}
+
+.rs-status-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rs-status-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+.rs-tag-searching { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.3); }
+.rs-tag-assigned  { background: rgba(107, 158, 114, 0.15); color: #6B9E72; border: 1px solid rgba(107, 158, 114, 0.35); }
+.rs-tag-arriving  { background: rgba(59, 130, 246, 0.15); color: #3b82f6; border: 1px solid rgba(59, 130, 246, 0.35); }
+.rs-tag-arrived   { background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35); }
+.rs-tag-progress  { background: rgba(107, 158, 114, 0.18); color: #6B9E72; border: 1px solid rgba(107, 158, 114, 0.4); }
+.rs-tag-completed { background: rgba(107, 158, 114, 0.25); color: #6B9E72; border: 1px solid #6B9E72; }
+.rs-tag-cancelled { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.35); }
+.rs-tag-rejected  { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.35); }
+
+.rs-status-headline {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 6px;
+}
+
+.rs-status-subtext {
+  font-size: 14px;
+  color: rgba(245, 240, 232, 0.6);
+  margin: 0 0 20px;
+}
+
+/* ── Stepper Timeline ───────────────────────────────── */
+.rs-stepper {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 28px;
+  position: relative;
+}
+
+.rs-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 2;
+  flex: 1;
+}
+
+.rs-step-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: 2px solid rgba(255, 255, 255, 0.18);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  color: rgba(245, 240, 232, 0.4);
+  transition: all 0.3s;
+}
+
+.rs-step-done .rs-step-circle {
+  background: #6B9E72;
+  border-color: #6B9E72;
+  color: #fff;
+}
+
+.rs-step-active .rs-step-circle {
+  background: #6B9E72;
+  border-color: #9ec9a3;
+  color: #fff;
+  box-shadow: 0 0 12px rgba(107, 158, 114, 0.6);
+}
+
+.rs-step-label {
+  font-size: 10.5px;
+  color: rgba(245, 240, 232, 0.45);
+  font-weight: 600;
+  text-align: center;
+}
+
+.rs-step-done .rs-step-label,
+.rs-step-active .rs-step-label {
+  color: #6B9E72;
+}
+
+.rs-step-connector {
+  position: absolute;
+  top: 14px;
+  left: 10%;
+  right: 10%;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.1);
+  z-index: 1;
+}
+
+/* ── Driver Profile Box ─────────────────────────────── */
+.rs-driver-box {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+
+.rs-driver-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.rs-driver-avatar {
+  width: 52px;
+  height: 52px;
+  background: #6B9E72;
+  color: #fff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  font-weight: 800;
+  box-shadow: 0 4px 12px rgba(107, 158, 114, 0.3);
+}
+
+.rs-driver-name {
+  font-size: 16px;
+  font-weight: 800;
+  margin: 0 0 4px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rs-driver-rating {
+  font-size: 12px;
+  color: #f59e0b;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-weight: 700;
+}
+
+.rs-driver-veh {
+  font-size: 12px;
+  color: rgba(245, 240, 232, 0.65);
+}
+
+.rs-driver-plate {
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 2px 7px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-weight: 700;
+  color: #F5F0E8;
+  letter-spacing: 0.5px;
+  margin-left: 6px;
+}
+
+.rs-driver-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.rs-btn-call {
+  background: rgba(107, 158, 114, 0.18);
+  border: 1px solid rgba(107, 158, 114, 0.35);
+  color: #6B9E72;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+
+.rs-btn-call:hover {
+  background: #6B9E72;
+  color: #fff;
+}
+
+.rs-btn-chat {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #F5F0E8;
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s;
+}
+
+.rs-btn-chat:hover {
+  background: rgba(107, 158, 114, 0.2);
+  border-color: #6B9E72;
+  color: #6B9E72;
+}
+
+/* ── Start PIN Banner ───────────────────────────────── */
+.rs-pin-banner {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1.5px dashed rgba(245, 158, 11, 0.4);
+  border-radius: 16px;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.rs-pin-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.rs-pin-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: #f59e0b;
+}
+
+.rs-pin-desc {
+  font-size: 12px;
+  color: rgba(245, 240, 232, 0.6);
+}
+
+.rs-pin-number {
+  font-family: monospace;
+  font-size: 26px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.15);
+  padding: 4px 14px;
+  border-radius: 10px;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+/* ── Route Details Card ─────────────────────────────── */
+.rs-route-card {
+  background: #1A1A1A;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.rs-route-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.rs-route-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  margin-top: 4px;
+  flex-shrink: 0;
+}
+
+.rs-dot-green { background: #6B9E72; box-shadow: 0 0 8px rgba(107, 158, 114, 0.6); }
+.rs-dot-red   { background: #ef4444; box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
+
+.rs-route-title {
+  font-size: 11px;
+  color: rgba(245, 240, 232, 0.45);
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.rs-route-addr {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rs-route-line {
+  width: 2px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.12);
+  margin-left: 5px;
+  margin-top: 4px;
+  margin-bottom: 4px;
+}
+
+/* ── Trip Stats Strip ───────────────────────────────── */
+.rs-stats-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.rs-stat-cell {
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  padding: 10px;
+  text-align: center;
+}
+
+.rs-stat-cell-lbl {
+  font-size: 10.5px;
+  color: rgba(245, 240, 232, 0.45);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 3px;
+}
+
+.rs-stat-cell-val {
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.rs-stat-green {
+  color: #6B9E72;
+}
+
+/* ── Actions Footer ─────────────────────────────────── */
+.rs-footer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.rs-btn-cancel {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-weight: 700;
+  font-size: 13.5px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.rs-btn-cancel:hover {
+  background: rgba(239, 68, 68, 0.22);
+}
+
+.rs-btn-invoice {
+  background: #6B9E72;
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 14px 24px;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  box-shadow: 0 8px 24px rgba(107, 158, 114, 0.35);
+  transition: all 0.2s;
+}
+
+.rs-btn-invoice:hover {
+  background: #5a8e61;
+  transform: translateY(-1px);
+}
+
+.rs-btn-book-new {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #F5F0E8;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  font-weight: 700;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s;
+}
+
+.rs-btn-book-new:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ── Modal for cancellation ─────────────────────────── */
+.rs-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.85);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.rs-modal {
+  background: #1A1A1A;
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.6);
+}
+
+.rs-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.rs-modal-head h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.rs-modal-close {
+  background: none;
+  border: none;
+  color: rgba(245, 240, 232, 0.5);
+  cursor: pointer;
+}
+
+.rs-reasons-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+}
+
+.rs-reason-item {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+  padding: 10px 14px;
+  text-align: left;
+  color: #F5F0E8;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.rs-reason-item:hover {
+  border-color: rgba(239, 68, 68, 0.3);
+}
+
+.rs-reason-active {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.rs-modal-btns {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.rs-modal-btns button {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rs-btn-keep {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #F5F0E8;
+}
+
+.rs-btn-confirm-cancel {
+  background: #ef4444;
+  border: none;
+  color: #fff;
+}
+
+.rs-btn-confirm-cancel:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 600px) {
+  .rs-stats-strip {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .rs-driver-box {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .rs-driver-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .rs-footer-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .rs-footer-actions > * {
+    width: 100%;
+    justify-content: center;
+  }
+}

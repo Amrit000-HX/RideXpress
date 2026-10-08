@@ -74,13 +74,19 @@ export interface LocationData { latLng: LatLng; address: string }
 
 interface SearchResult { display_name: string; lat: string; lon: string }
 
+export interface BookingOptions {
+  paymentMethod?: string
+  notes?: string
+  estimatedMinutes?: number
+}
+
 interface MapPickerProps {
   vehicleType:      string
   vehiclePrice:     number
   vehiclePriceUnit: string
   vehicleEta:       string
   onClose:          () => void
-  onConfirm:        () => void
+  onConfirm:        (options?: BookingOptions) => void
   onPickupChange:   (loc: LocationData) => void
   onDropChange:     (loc: LocationData) => void
   onDistanceChange: (km: number, fare: number) => void
@@ -198,6 +204,8 @@ export default function MapPicker({
   const [flyZoom,     setFlyZoom]     = useState(DEFAULT_ZOOM)
   const [gpsLoading,  setGpsLoading]  = useState(false)
   const [gpsError,    setGpsError]    = useState('')
+  const [paymentMethod, setPaymentMethod] = useState('Cash on Delivery / UPI')
+  const [notes, setNotes] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [suggestions, setSuggestions] = useState<SearchResult[]>([])
   const [searchLoad,  setSearchLoad]  = useState(false)
@@ -559,7 +567,7 @@ export default function MapPicker({
           <div className="mp-fare-block">
             <div className="mp-fare-details">
               <div className="mp-fare-label">
-                {distance !== null ? `Trip Distance: ${distance} km` : 'Estimated Distance'}
+                {distance !== null ? `Trip: ${distance} km · ~${Math.max(4, Math.round(distance * 2.5))} min` : `Estimated Time: ~${vehicleEta}`}
               </div>
               <div className="mp-fare-amount">
                 {fare !== null ? (
@@ -569,15 +577,58 @@ export default function MapPicker({
                 )}
               </div>
               <div className="mp-fare-note">
-                <Shield size={12} /> Standard Fare · Live Calculated
+                <Shield size={12} /> Live Distance Fare
               </div>
+            </div>
+
+            {/* Payment Method & Notes */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', width: '100%' }}>
+              <select
+                value={paymentMethod}
+                onChange={e => setPaymentMethod(e.target.value)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#F5F0E8',
+                  borderRadius: '10px',
+                  padding: '7px 10px',
+                  fontSize: '12px',
+                  outline: 'none',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                }}
+              >
+                <option value="Cash on Delivery / UPI" style={{ background: '#1A1A1A' }}>💵 Cash on Delivery / UPI</option>
+                <option value="UPI Instant (GPay / PhonePe)" style={{ background: '#1A1A1A' }}>📱 UPI Instant (GPay / PhonePe)</option>
+                <option value="Credit / Debit Card" style={{ background: '#1A1A1A' }}>💳 Credit / Debit Card</option>
+                <option value="RideXpress Wallet" style={{ background: '#1A1A1A' }}>👛 RideXpress Wallet</option>
+              </select>
+
+              <input
+                placeholder="Optional notes for driver (e.g. Near gate 2)…"
+                value={notes}
+                onChange={e => setNotes(e.target.value)}
+                style={{
+                  background: 'rgba(255,255,255,0.06)',
+                  border: '1px solid rgba(255,255,255,0.15)',
+                  color: '#F5F0E8',
+                  borderRadius: '10px',
+                  padding: '7px 10px',
+                  fontSize: '12px',
+                  outline: 'none',
+                  fontFamily: 'inherit',
+                }}
+              />
             </div>
 
             {/* Confirm Button */}
             <button
               className="mp-confirm-btn"
               disabled={!pickup || !drop}
-              onClick={onConfirm}
+              onClick={() => {
+                const estMin = distance ? Math.max(4, Math.round(distance * 2.5)) : 10
+                onConfirm({ paymentMethod, notes, estimatedMinutes: estMin })
+              }}
             >
               <Navigation size={18} />
               <span>Confirm {vehicleType}</span>

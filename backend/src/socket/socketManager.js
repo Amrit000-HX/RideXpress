@@ -48,7 +48,9 @@ const getConnectedDrivers = () => connectedDrivers
  * Safely no-ops if user is offline.
  */
 const emitToUser = (io, userId, event, payload) => {
-  const socketId = connectedUsers.get(String(userId))
+  const userIdStr = String(userId)
+  io.to(`user:${userIdStr}`).emit(event, payload)
+  const socketId = connectedUsers.get(userIdStr)
   if (socketId) {
     io.to(socketId).emit(event, payload)
     return true
@@ -58,11 +60,13 @@ const emitToUser = (io, userId, event, payload) => {
 
 /**
  * Emit to a specific driver by their driverId.
- * Safely no-ops if driver is offline.
+ * Safely emits to both driver room and direct socket if available.
  */
 const emitToDriver = (io, driverId, payload_event, payload) => {
-  const entry = connectedDrivers.get(String(driverId))
-  if (entry) {
+  const driverIdStr = String(driverId)
+  io.to(`driver:${driverIdStr}`).emit(payload_event, payload)
+  const entry = connectedDrivers.get(driverIdStr)
+  if (entry && entry.socketId) {
     io.to(entry.socketId).emit(payload_event, payload)
     return true
   }
@@ -102,19 +106,49 @@ module.exports = function mountSocketManager(io) {
     const { userId, role } = socket.data
     console.log(`✅ [Socket] Connected  | ${role.padEnd(8)} | userId: ${userId} | socketId: ${socket.id}`)
 
-    // ── Register in correct registry ────────────────────────────────────
+    // ── Register in correct registry & join authenticated personal rooms ──
     if (role === 'employee') {
+      socket.join(`driver:${userId}`)
+
+      // Pre-seed in-memory entry
       connectedDrivers.set(userId, {
         socketId:    socket.id,
         lat:         null,
         lng:         null,
         vehicleType: null,
-        isAvailable: false,   // driver must explicitly go "online"
+        isAvailable: false,
         isOnline:    false,
-        lastPing:    null,
+        lastPing:    Date.now(),
       })
+
+      // Asynchronously seed authoritative state from MongoDB
+      const Employee = require('../models/Employee')
+      Employee.findById(userId)
+        .select('onlineStatus availabilityStatus location currentLocation vehicleCategory vehicleNumber name')
+        .then((emp) => {
+          if (!emp) return
+          const isOnline = emp.onlineStatus === 'ONLINE'
+          const isAvailable = isOnline && emp.availabilityStatus === 'AVAILABLE'
+          const lat = emp.currentLocation?.lat ?? emp.location?.coordinates?.[1] ?? null
+          const lng = emp.currentLocation?.lng ?? emp.location?.coordinates?.[0] ?? null
+          const currentEntry = connectedDrivers.get(userId) || {}
+
+          connectedDrivers.set(userId, {
+            ...currentEntry,
+            socketId: socket.id,
+            lat: lat ?? currentEntry.lat,
+            lng: lng ?? currentEntry.lng,
+            vehicleType: emp.vehicleCategory || currentEntry.vehicleType,
+            isAvailable: isAvailable,
+            isOnline: isOnline,
+            lastPing: Date.now(),
+          })
+          console.log(`   [Driver Seeded] driverId: ${userId} | isOnline: ${isOnline} | lat: ${lat} | lng: ${lng}`)
+        })
+        .catch((err) => console.warn('[Socket Employee Seed]', err.message))
     } else {
       // 'user' or 'admin'
+      socket.join(`user:${userId}`)
       connectedUsers.set(userId, socket.id)
     }
 
@@ -131,7 +165,7 @@ module.exports = function mountSocketManager(io) {
 
     // ── Driver: Go Online ────────────────────────────────────────────────
     // Payload: { vehicleType: 'Scooty' | 'Moto' | 'Sedan' | ... }
-    socket.on('driver:go_online', ({ vehicleType } = {}) => {
+    socket.on('driver:go_online', async ({ vehicleType } = {}) => {
       if (role !== 'employee') return
       const entry = connectedDrivers.get(userId) || {}
       connectedDrivers.set(userId, {
@@ -144,10 +178,21 @@ module.exports = function mountSocketManager(io) {
       })
       socket.emit('driver:status_update', { isOnline: true, isAvailable: true })
       console.log(`🟢 [Driver Online]  driverId: ${userId} | vehicle: ${vehicleType}`)
+
+      // Persist to MongoDB authoritative state
+      try {
+        const Employee = require('../models/Employee')
+        await Employee.findByIdAndUpdate(userId, {
+          onlineStatus: 'ONLINE',
+          availabilityStatus: 'AVAILABLE',
+        })
+      } catch (err) {
+        console.error('[driver:go_online DB write]', err.message)
+      }
     })
 
     // ── Driver: Go Offline ───────────────────────────────────────────────
-    socket.on('driver:go_offline', () => {
+    socket.on('driver:go_offline', async () => {
       if (role !== 'employee') return
       const entry = connectedDrivers.get(userId) || {}
       connectedDrivers.set(userId, {
@@ -157,6 +202,16 @@ module.exports = function mountSocketManager(io) {
       })
       socket.emit('driver:status_update', { isOnline: false, isAvailable: false })
       console.log(`🔴 [Driver Offline] driverId: ${userId}`)
+
+      // Persist to MongoDB authoritative state
+      try {
+        const Employee = require('../models/Employee')
+        await Employee.findByIdAndUpdate(userId, {
+          onlineStatus: 'OFFLINE',
+        })
+      } catch (err) {
+        console.error('[driver:go_offline DB write]', err.message)
+      }
     })
 
     // ── Driver: Location Update (GPS Streaming) ─────────────────────────
@@ -166,58 +221,113 @@ module.exports = function mountSocketManager(io) {
       const { lat, lng, heading, speed, activeRideId } = data || {}
       if (lat == null || lng == null) return
 
+      const latN = Number(lat)
+      const lngN = Number(lng)
+
+      // Validate coordinates before writing — reject NaN, Infinity, out-of-range
+      if (!isFinite(latN) || !isFinite(lngN)) return
+      if (latN < -90 || latN > 90 || lngN < -180 || lngN > 180) return
+
+      // 1. Update in-memory registry synchronously (keeps socket latency zero)
       const entry = connectedDrivers.get(userId) || {}
       connectedDrivers.set(userId, {
         ...entry,
         socketId: socket.id,
-        lat: Number(lat),
-        lng: Number(lng),
-        heading: Number(heading) || 0,
-        speed: Number(speed) || 0,
+        lat:      latN,
+        lng:      lngN,
+        heading:  Number(heading) || 0,
+        speed:    Number(speed) || 0,
         isOnline: true,
         lastPing: Date.now(),
       })
 
-      // 1. If assigned to an active ride, forward GPS directly to customer's ride room
+      // 2. Persist GPS to MongoDB — fire-and-forget (no await, zero added latency)
+      //    Writes GeoJSON [lng, lat] to Employee.location for 2dsphere $near queries.
+      const Employee = require('../models/Employee')
+      Employee.findByIdAndUpdate(userId, {
+        location: { type: 'Point', coordinates: [lngN, latN] },
+        'currentLocation.lat':       latN,
+        'currentLocation.lng':       lngN,
+        'currentLocation.heading':   Number(heading) || 0,
+        'currentLocation.speed':     Number(speed) || 0,
+        'currentLocation.updatedAt': new Date(),
+      }).catch((err) => console.error('[location_update DB write]', err.message))
+
+      // 3. If assigned to an active ride, forward GPS to customer's ride room
       if (activeRideId) {
         io.to(`ride:${activeRideId}`).emit('driver:position', {
           driverId: userId,
-          lat: Number(lat),
-          lng: Number(lng),
-          heading: Number(heading) || 0,
-          speed: Number(speed) || 0,
+          lat:      latN,
+          lng:      lngN,
+          heading:  Number(heading) || 0,
+          speed:    Number(speed) || 0,
           timestamp: Date.now(),
         })
       }
 
-      // 2. Broadcast available driver positions for real-time fleet map view
+      // 4. Broadcast available driver positions for real-time fleet map view
       io.emit('fleet:driver_location', {
-        driverId: userId,
+        id:          userId,
+        driverId:    userId,
         vehicleType: entry.vehicleType,
-        lat: Number(lat),
-        lng: Number(lng),
-        heading: Number(heading) || 0,
+        lat:         latN,
+        lng:         lngN,
+        heading:     Number(heading) || 0,
         isAvailable: entry.isAvailable,
       })
     })
 
     // ── Fleet: Request Active Nearby Drivers ─────────────────────────────
-    socket.on('fleet:get_nearby', () => {
+    socket.on('fleet:get_nearby', async () => {
       const now = Date.now()
       const activeList = []
+      const foundIds = new Set()
+
       for (const [id, d] of connectedDrivers.entries()) {
-        // Consider driver active if pinged in last 30 seconds
-        if (d.isOnline && d.lat != null && d.lng != null && (now - (d.lastPing || 0) < 30000)) {
+        // Consider driver active if online with coordinates and pinged within 60s
+        if (d.isOnline && d.lat != null && d.lng != null && (now - (d.lastPing || 0) < 60000)) {
           activeList.push({
-            id,
+            id: String(id),
+            driverId: String(id),
             vehicleType: d.vehicleType,
             lat: d.lat,
             lng: d.lng,
             heading: d.heading || 0,
             isAvailable: d.isAvailable,
           })
+          foundIds.add(String(id))
         }
       }
+
+      // Fallback query to MongoDB for persisted online drivers who may not have pinged yet
+      try {
+        const Employee = require('../models/Employee')
+        const onlineDrivers = await Employee.find({
+          onlineStatus: 'ONLINE',
+          availabilityStatus: 'AVAILABLE',
+          isActive: true,
+          _id: { $nin: Array.from(foundIds) },
+        }).select('vehicleCategory currentLocation location _id')
+
+        for (const emp of onlineDrivers) {
+          const lat = emp.currentLocation?.lat ?? emp.location?.coordinates?.[1]
+          const lng = emp.currentLocation?.lng ?? emp.location?.coordinates?.[0]
+          if (lat != null && lng != null) {
+            activeList.push({
+              id: String(emp._id),
+              driverId: String(emp._id),
+              vehicleType: emp.vehicleCategory,
+              lat,
+              lng,
+              heading: emp.currentLocation?.heading || 0,
+              isAvailable: true,
+            })
+          }
+        }
+      } catch (err) {
+        // silent fallback
+      }
+
       socket.emit('fleet:nearby_drivers', { drivers: activeList })
     })
 
@@ -388,6 +498,42 @@ module.exports = function mountSocketManager(io) {
   io.getConnectedDrivers = () => getConnectedDrivers()
   io.getUserSocket   = (userId)   => getUserSocket(io, userId)
   io.getDriverSocket = (driverId) => getDriverSocket(io, driverId)
+
+  // ── 4. Periodic timeout check: expire searching/requested rides after 2 minutes ────
+  setInterval(async () => {
+    try {
+      const Ride = require('../models/Ride')
+      const twoMinutesAgo = new Date(Date.now() - 120 * 1000)
+      const expiredRides = await Ride.find({
+        status: { $in: ['searching', 'requested'] },
+        createdAt: { $lt: twoMinutesAgo },
+      })
+      for (const r of expiredRides) {
+        r.status = 'expired'
+        r.timeline.push({
+          status: 'expired',
+          timestamp: new Date(),
+          note: 'Request timed out after waiting for driver response',
+        })
+        await r.save()
+        io.emitToUser(String(r.customerId), 'ride:no_driver', {
+          rideId: r._id,
+          bookingId: r.bookingId,
+          status: 'expired',
+        })
+        io.emitToUser(String(r.customerId), 'notification:new', {
+          id: Date.now(),
+          title: '⌛ Request Timed Out',
+          body: 'We could not find an available driver in time. Please try booking again.',
+          type: 'warning',
+          timestamp: new Date().toISOString(),
+          read: false,
+        })
+      }
+    } catch (err) {
+      // silent catch for background job
+    }
+  }, 15000)
 }
 
 // Export registries so Phase 3 (driverMatcher.js) can import directly

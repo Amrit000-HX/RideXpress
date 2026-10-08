@@ -14,7 +14,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useAuth } from '../contexts/AuthContext'
 import {
   Printer, ArrowRight, Home, Phone, Star,
-  Shield, Check, Calendar, KeyRound, User, MessageSquare,
+  Shield, Check, Calendar, KeyRound, User, MessageSquare, Car,
 } from 'lucide-react'
 import ChatBox from '../components/ChatBox'
 import './RideReceipt.css'
@@ -356,6 +356,10 @@ export default function RideReceipt() {
           <button className="rc-btn rc-btn-primary" onClick={() => navigate('/book')}>
             Book Another Ride <ArrowRight size={16} />
           </button>
+
+          <Link to="/dashboard" className="rc-btn rc-btn-outline" style={{ textDecoration: 'none' }}>
+            <Car size={15} /> My Rides Dashboard
+          </Link>
 
           <Link to="/" className="rc-btn rc-btn-outline">
             <Home size={15} /> Back to Home

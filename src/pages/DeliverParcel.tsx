@@ -96,16 +96,15 @@ export default function DeliverParcel() {
   useEffect(() => {
     if (!isAuthenticated) navigate('/login', { state: { from: '/deliver' } })
   }, [isAuthenticated, navigate])
-  if (!isAuthenticated) return null
 
   /* Parallax scroll */
   useEffect(() => {
     const onScroll = () => {
       const s = window.scrollY
-      heroContent.current && (
-        (heroContent.current.style.transform = `translateY(${s * 0.4}px)`),
-        (heroContent.current.style.opacity = String(Math.max(0, 1 - s / 600)))
-      )
+      if (heroContent.current) {
+        heroContent.current.style.transform = `translateY(${s * 0.4}px)`
+        heroContent.current.style.opacity = String(Math.max(0, 1 - s / 600))
+      }
       cardUpRefs.current.forEach(el => el && el.style.setProperty('--offset-up', `${s * -0.05}px`))
       cardDownRefs.current.forEach(el => el && el.style.setProperty('--offset-down', `${s * 0.05}px`))
     }
@@ -114,6 +113,8 @@ export default function DeliverParcel() {
   }, [])
 
   useEffect(() => { window.scrollTo(0, 0) }, [])
+
+  if (!isAuthenticated) return null
 
   return (
     <div className="dp-root">

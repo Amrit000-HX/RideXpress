@@ -1,0 +1,361 @@
+/* ════════════════════════════════════════════════════════
+   UserDashboard.css — User ride management hub
+   Palette: Cream #F5F0E8 · Sage-Green #6B9E72 · Charcoal #1A1A1A
+   ════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&display=swap');
+
+.ud-page {
+  min-height: 100vh;
+  background: #0f0f0f;
+  font-family: 'Outfit', sans-serif;
+  color: #F5F0E8;
+  padding-bottom: 60px;
+}
+
+/* ── Header ─────────────────────────────────────────── */
+.ud-header {
+  background: #1A1A1A;
+  border-bottom: 1px solid rgba(107,158,114,0.2);
+  padding: 28px 24px;
+}
+.ud-header-inner {
+  max-width: 900px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.ud-header-label { font-size: 12px; color: rgba(245,240,232,0.5); margin: 0 0 4px; letter-spacing: 0.5px; }
+.ud-header-name  { font-size: 28px; font-weight: 800; margin: 0; }
+.ud-header-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.ud-book-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: #6B9E72; color: #fff;
+  border: none; border-radius: 12px; padding: 10px 18px;
+  font-size: 14px; font-weight: 700; cursor: pointer;
+  text-decoration: none; transition: all 0.2s;
+}
+.ud-book-btn:hover { background: #5a8f61; transform: translateY(-1px); }
+.ud-book-btn-lg { padding: 14px 28px; font-size: 16px; margin-top: 16px; }
+.ud-logout-btn {
+  background: rgba(255,255,255,0.06); color: rgba(245,240,232,0.7);
+  border: 1px solid rgba(255,255,255,0.12); border-radius: 10px;
+  padding: 8px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+}
+.ud-logout-btn:hover { background: rgba(239,68,68,0.15); color: #ef4444; border-color: rgba(239,68,68,0.3); }
+
+/* ── Stats strip ─────────────────────────────────────── */
+.ud-stats-strip {
+  max-width: 900px; margin: 0 auto; padding: 20px 24px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
+}
+.ud-stat {
+  background: #1A1A1A; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px; padding: 16px;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  transition: all 0.2s;
+}
+.ud-stat:hover { border-color: rgba(107,158,114,0.3); }
+.ud-stat-icon { color: #6B9E72; margin-bottom: 4px; }
+.ud-stat-val  { font-size: 22px; font-weight: 800; }
+.ud-stat-lbl  { font-size: 11px; color: rgba(245,240,232,0.5); text-align: center; }
+
+/* ── Tabs ───────────────────────────────────────────── */
+.ud-tabs {
+  max-width: 900px; margin: 0 auto; padding: 0 24px;
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.ud-tab {
+  display: flex; align-items: center; gap: 6px;
+  background: transparent; color: rgba(245,240,232,0.5);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 20px;
+  padding: 8px 18px; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: all 0.2s;
+}
+.ud-tab:hover { color: #F5F0E8; border-color: rgba(255,255,255,0.2); }
+.ud-tab-active { background: #6B9E72; color: #fff; border-color: #6B9E72; }
+.ud-tab-badge {
+  background: #ef4444; color: #fff; border-radius: 10px;
+  padding: 1px 7px; font-size: 11px; font-weight: 700; min-width: 20px;
+}
+.ud-tab-active .ud-tab-badge { background: rgba(255,255,255,0.3); }
+
+/* ── Content area ───────────────────────────────────── */
+.ud-content { max-width: 900px; margin: 0 auto; padding: 20px 24px; }
+
+/* ── Cards ──────────────────────────────────────────── */
+.ud-card {
+  background: #1A1A1A; border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 20px; padding: 24px; margin-bottom: 16px;
+}
+.ud-active-card { border-color: rgba(107,158,114,0.35); }
+.ud-card-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 16px;
+}
+.ud-card-label { font-size: 11px; color: #6B9E72; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; margin: 0; }
+.ud-card-title { font-size: 20px; font-weight: 800; margin: 4px 0 0; }
+
+/* ── Status badge ───────────────────────────────────── */
+.ud-status-badge {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 12px; border-radius: 20px; border: 1px solid;
+  font-size: 12px; font-weight: 700;
+}
+.ud-status-desc {
+  font-size: 14px; color: rgba(245,240,232,0.6);
+  margin: 0 0 16px; padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+
+/* ── Status timeline ────────────────────────────────── */
+.ud-timeline {
+  display: flex; align-items: flex-start; gap: 0;
+  padding: 12px 0 20px; overflow-x: auto;
+  scrollbar-width: none;
+}
+.ud-timeline::-webkit-scrollbar { display: none; }
+.ud-tl-step {
+  display: flex; flex-direction: column; align-items: center;
+  flex: 1; min-width: 70px; gap: 4px; position: relative;
+}
+.ud-tl-dot {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: rgba(255,255,255,0.08); border: 2px solid rgba(255,255,255,0.15);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; z-index: 1; flex-shrink: 0;
+  transition: all 0.3s;
+}
+.ud-tl-done .ud-tl-dot {
+  background: #6B9E72; border-color: #6B9E72; color: #fff;
+}
+.ud-tl-active .ud-tl-dot {
+  background: #6B9E72; border-color: #9dc7a4;
+  box-shadow: 0 0 12px rgba(107,158,114,0.6);
+}
+.ud-tl-pulse {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; animation: ud-pulse 1.5s infinite;
+}
+@keyframes ud-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(0.8); }
+}
+.ud-tl-label { font-size: 10px; color: rgba(245,240,232,0.5); text-align: center; margin-top: 4px; }
+.ud-tl-done .ud-tl-label, .ud-tl-active .ud-tl-label { color: #6B9E72; font-weight: 600; }
+.ud-tl-line {
+  position: absolute; top: 11px; left: calc(50% + 11px);
+  width: calc(100% - 22px); height: 2px;
+  background: rgba(255,255,255,0.1); z-index: 0;
+  transition: background 0.3s;
+}
+.ud-tl-line-done { background: #6B9E72; }
+
+/* ── Route block ────────────────────────────────────── */
+.ud-route-block { margin-bottom: 16px; }
+.ud-route-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 10px 14px; background: rgba(255,255,255,0.04);
+  border-radius: 12px; margin-bottom: 4px;
+}
+.ud-route-dot {
+  width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
+}
+.ud-dot-green { background: #6B9E72; box-shadow: 0 0 6px rgba(107,158,114,0.5); }
+.ud-dot-red   { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+.ud-route-label { font-size: 10px; color: #6B9E72; font-weight: 700; letter-spacing: 0.5px; margin-bottom: 2px; }
+.ud-route-addr  { font-size: 13px; font-weight: 500; line-height: 1.4; }
+.ud-route-connector { width: 2px; height: 12px; background: rgba(255,255,255,0.1); margin-left: 18px; }
+
+/* ── Driver card ────────────────────────────────────── */
+.ud-driver-card {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(107,158,114,0.1); border: 1px solid rgba(107,158,114,0.25);
+  border-radius: 14px; padding: 14px; margin-bottom: 14px;
+}
+.ud-driver-avatar {
+  width: 44px; height: 44px; border-radius: 50%;
+  background: #6B9E72; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 800; flex-shrink: 0;
+}
+.ud-driver-info { flex: 1; }
+.ud-driver-name { font-size: 15px; font-weight: 700; }
+.ud-driver-meta { display: flex; gap: 12px; margin-top: 3px; flex-wrap: wrap; }
+.ud-driver-vehicle { font-size: 12px; color: rgba(245,240,232,0.6); }
+.ud-driver-rating  { font-size: 12px; color: #6B9E72; display: flex; align-items: center; gap: 3px; }
+.ud-call-btn {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: #6B9E72; color: #fff; border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; text-decoration: none; flex-shrink: 0;
+  transition: all 0.2s;
+}
+.ud-call-btn:hover { background: #5a8f61; }
+
+/* ── Fare row ───────────────────────────────────────── */
+.ud-fare-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+.ud-fare-item {
+  flex: 1; min-width: 90px;
+  background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 10px; padding: 10px 12px;
+  display: flex; flex-direction: column; gap: 3px;
+}
+.ud-fare-label { font-size: 10px; color: rgba(245,240,232,0.5); text-transform: uppercase; letter-spacing: 0.5px; }
+.ud-fare-value { font-size: 14px; font-weight: 700; }
+.ud-fare-green { color: #6B9E72; }
+.ud-pin { color: #f59e0b; letter-spacing: 3px; font-family: monospace; font-size: 16px; }
+
+/* ── Actions ────────────────────────────────────────── */
+.ud-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.ud-btn-ghost {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,255,255,0.06); color: rgba(245,240,232,0.8);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 10px;
+  padding: 9px 14px; font-size: 13px; font-weight: 600; cursor: pointer;
+  transition: all 0.2s;
+}
+.ud-btn-ghost:hover { background: rgba(255,255,255,0.1); color: #F5F0E8; }
+.ud-btn-active { background: rgba(107,158,114,0.2); border-color: rgba(107,158,114,0.4); color: #6B9E72; }
+.ud-btn-danger {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(239,68,68,0.12); color: #ef4444;
+  border: 1px solid rgba(239,68,68,0.25); border-radius: 10px;
+  padding: 9px 14px; font-size: 13px; font-weight: 700; cursor: pointer;
+  transition: all 0.2s;
+}
+.ud-btn-danger:hover { background: rgba(239,68,68,0.25); }
+.ud-btn-danger:disabled { opacity: 0.5; cursor: not-allowed; }
+.ud-btn-full { width: 100%; justify-content: center; padding: 13px; font-size: 15px; }
+
+/* ── Loading / Empty ────────────────────────────────── */
+.ud-loading { display: flex; align-items: center; gap: 12px; color: rgba(245,240,232,0.5); padding: 40px; justify-content: center; }
+.ud-empty {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 10px; padding: 60px 24px; text-align: center;
+}
+.ud-empty-icon { color: rgba(245,240,232,0.15); margin-bottom: 8px; }
+.ud-empty h3 { font-size: 20px; font-weight: 700; margin: 0; }
+.ud-empty p  { font-size: 14px; color: rgba(245,240,232,0.5); margin: 0; }
+.ud-empty-sm {
+  display: flex; flex-direction: column; align-items: center;
+  gap: 8px; padding: 40px; text-align: center;
+  color: rgba(245,240,232,0.4);
+}
+.ud-empty-sm p { margin: 0; font-size: 14px; }
+
+/* ── Spin ───────────────────────────────────────────── */
+.ud-spin { animation: ud-spin 1s linear infinite; }
+@keyframes ud-spin { to { transform: rotate(360deg); } }
+
+/* ── History list ───────────────────────────────────── */
+.ud-history-list { display: flex; flex-direction: column; gap: 8px; }
+.ud-history-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px; background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06); border-radius: 12px;
+  transition: all 0.2s;
+}
+.ud-history-row:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); }
+.ud-history-icon {
+  width: 36px; height: 36px; border-radius: 10px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.ud-history-info { flex: 1; min-width: 0; }
+.ud-history-route { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; flex-wrap: wrap; }
+.ud-history-from, .ud-history-to { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+.ud-arrow { color: rgba(245,240,232,0.3); flex-shrink: 0; }
+.ud-history-meta { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(245,240,232,0.4); margin-top: 3px; }
+.ud-history-id  { color: rgba(245,240,232,0.3); font-family: monospace; }
+.ud-sep { opacity: 0.4; }
+.ud-history-right { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; flex-shrink: 0; }
+.ud-history-fare   { font-size: 15px; font-weight: 800; color: #6B9E72; }
+.ud-history-status { font-size: 11px; font-weight: 600; }
+
+/* ── Error banner ───────────────────────────────────── */
+.ud-error-banner {
+  max-width: 900px; margin: 12px auto; padding: 12px 20px;
+  background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 10px; display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: #ef4444;
+}
+.ud-error-banner button { background: none; border: none; color: inherit; cursor: pointer; margin-left: auto; }
+
+/* ── Notification list ──────────────────────────────── */
+.ud-notif-list { display: flex; flex-direction: column; gap: 4px; }
+.ud-notif-row {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 12px; border-radius: 10px;
+  transition: background 0.2s;
+}
+.ud-notif-row:hover { background: rgba(255,255,255,0.04); }
+.ud-notif-unread { background: rgba(107,158,114,0.06); }
+.ud-notif-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
+.ud-dot-success { background: #6B9E72; }
+.ud-dot-info    { background: #3b82f6; }
+.ud-dot-warning { background: #f59e0b; }
+.ud-dot-error   { background: #ef4444; }
+.ud-dot-ride    { background: #6B9E72; }
+.ud-notif-content { flex: 1; }
+.ud-notif-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.ud-notif-body  { font-size: 12px; color: rgba(245,240,232,0.6); line-height: 1.4; }
+.ud-notif-time  { font-size: 10px; color: rgba(245,240,232,0.35); margin-top: 4px; display: flex; align-items: center; gap: 4px; }
+.ud-notif-badge { width: 8px; height: 8px; border-radius: 50%; background: #6B9E72; flex-shrink: 0; margin-top: 5px; }
+
+/* ── Cancel Modal ───────────────────────────────────── */
+.ud-modal-backdrop {
+  position: fixed; inset: 0; z-index: 9999;
+  background: rgba(0,0,0,0.8); backdrop-filter: blur(6px);
+  display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.ud-modal {
+  background: #1A1A1A; border: 1px solid rgba(239,68,68,0.3);
+  border-radius: 20px; padding: 28px; width: 100%; max-width: 440px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+}
+.ud-modal-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.ud-modal-header h3 { font-size: 20px; font-weight: 800; margin: 0; }
+.ud-modal-close {
+  background: none; border: none; color: rgba(245,240,232,0.5);
+  cursor: pointer; padding: 4px;
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.2s;
+}
+.ud-modal-close:hover { color: #F5F0E8; }
+.ud-modal-desc { font-size: 14px; color: rgba(245,240,232,0.6); margin: 0 0 16px; }
+.ud-reason-list { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
+.ud-reason-btn {
+  background: rgba(255,255,255,0.06); color: rgba(245,240,232,0.7);
+  border: 1px solid rgba(255,255,255,0.1); border-radius: 8px;
+  padding: 8px 14px; font-size: 13px; cursor: pointer; transition: all 0.2s;
+}
+.ud-reason-btn:hover { background: rgba(255,255,255,0.1); color: #F5F0E8; }
+.ud-reason-active { background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.4); color: #ef4444; }
+.ud-reason-textarea {
+  width: 100%; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 10px; padding: 12px; color: #F5F0E8; font-size: 13px;
+  font-family: 'Outfit', sans-serif; resize: none; margin-bottom: 16px;
+  box-sizing: border-box;
+}
+.ud-reason-textarea:focus { outline: none; border-color: rgba(239,68,68,0.4); }
+.ud-modal-actions { display: flex; gap: 10px; }
+.ud-modal-actions .ud-btn-ghost { flex: 1; justify-content: center; }
+
+/* ── Responsive ─────────────────────────────────────── */
+@media (max-width: 600px) {
+  .ud-stats-strip { grid-template-columns: repeat(3, 1fr); gap: 8px; padding: 16px; }
+  .ud-stat { padding: 12px 8px; }
+  .ud-stat-val { font-size: 18px; }
+  .ud-header-inner { flex-direction: column; align-items: flex-start; }
+  .ud-header-actions { width: 100%; }
+  .ud-book-btn, .ud-logout-btn { flex: 1; justify-content: center; }
+  .ud-history-from, .ud-history-to { max-width: 100px; }
+  .ud-tabs { gap: 6px; }
+  .ud-tab { padding: 7px 12px; font-size: 12px; }
+  .ud-timeline { padding-bottom: 16px; }
+  .ud-tl-label { font-size: 9px; }
+}

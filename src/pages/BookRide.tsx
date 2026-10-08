@@ -361,7 +361,7 @@ export default function BookRide() {
     }
   }, [scrollYProgress])
 
-  const handleConfirm = async () => {
+  const handleConfirm = async (bookingOptions?: { paymentMethod?: string; notes?: string; estimatedMinutes?: number }) => {
     if (!selected) return
 
     const pickupLat = pickupLoc?.latLng.lat || 19.0760
@@ -386,36 +386,16 @@ export default function BookRide() {
           lng: dropLng,
         },
         distanceKm: dist,
+        estimatedMinutes: bookingOptions?.estimatedMinutes || Math.max(5, Math.round(dist * 2.5)),
         estimatedFare,
+        paymentMethod: bookingOptions?.paymentMethod || 'Cash on Delivery / UPI',
+        notes: bookingOptions?.notes || '',
       })
 
       const ride = res.ride
-      const rideData = {
-        rideId: ride.id,
-        bookingId: ride.bookingId,
-        customerName: user?.name || 'Customer',
-        customerEmail: user?.email || 'customer@ridexpress.com',
-        customerPhone: user?.phone || '+91 98765 43210',
-        pickupAddress: ride.pickup.address,
-        dropAddress: ride.drop.address,
-        vehicleType: ride.vehicleType,
-        vehicleImage: selected.img,
-        distanceKm: ride.distanceKm,
-        totalFare: ride.estimatedFare,
-        driverName: ride.driver.name,
-        driverPhone: ride.driver.phone,
-        driverVehicleNumber: ride.driver.vehicleNumber,
-        driverRating: ride.driver.rating,
-        startRidePin: ride.startRidePin,
-        paymentMethod: 'Cash on Delivery / UPI',
-        bookedAt: new Date(ride.bookedAt).toLocaleString('en-IN', {
-          dateStyle: 'medium',
-          timeStyle: 'short',
-        }),
-      }
-
       setSelected(null)
-      navigate('/ride-receipt', { state: rideData })
+      // Navigate directly to live tracking view!
+      navigate(`/ride-status/${ride.id || ride.bookingId}`, { state: { ride } })
     } catch (err) {
       console.warn('Real-time matching note (using fallback):', err)
       const fallbackData = {
@@ -435,7 +415,8 @@ export default function BookRide() {
         driverVehicleNumber: 'MH 02 EQ 8492',
         driverRating: 4.94,
         startRidePin: Math.floor(1000 + Math.random() * 9000).toString(),
-        paymentMethod: 'Cash on Delivery / UPI',
+        paymentMethod: bookingOptions?.paymentMethod || 'Cash on Delivery / UPI',
+        notes: bookingOptions?.notes || '',
         bookedAt: new Date().toLocaleString('en-IN', {
           dateStyle: 'medium',
           timeStyle: 'short',

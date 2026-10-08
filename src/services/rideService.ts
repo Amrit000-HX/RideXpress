@@ -14,8 +14,10 @@ export interface CreateRidePayload {
     lng: number
   }
   distanceKm: number
+  estimatedMinutes?: number
   estimatedFare: number
   paymentMethod?: string
+  notes?: string
 }
 
 export interface FareBreakdown {
@@ -24,6 +26,17 @@ export interface FareBreakdown {
   serviceFee: number
   taxAmount: number
   totalFare: number
+}
+
+export interface RideDriverInfo {
+  id: string | null
+  name: string
+  phone: string
+  vehicleNumber: string
+  vehicleType?: string
+  rating: number
+  etaMinutes?: number | null
+  distanceKm?: number | null
 }
 
 export interface RideCustomerInfo {
@@ -41,23 +54,35 @@ export interface RideResponse {
   pickup: { address: string; lat: number; lng: number }
   drop: { address: string; lat: number; lng: number }
   distanceKm: number
+  estimatedMinutes?: number
   estimatedFare: number
   actualFare?: number
   fareBreakdown?: FareBreakdown
   paymentMethod?: string
   paymentStatus?: string
   startRidePin: string
-  driver: {
-    id: string
-    name: string
-    phone: string
-    vehicleNumber: string
-    rating: number
-    etaMinutes: number
-    distanceKm: number
-  }
+  notes?: string
+  driver: RideDriverInfo | null
   status: string
   bookedAt: string
+  acceptedAt?: string | null
+  arrivedAt?: string | null
+  startedAt?: string | null
+  completedAt?: string | null
+  cancelledAt?: string | null
+  cancelledBy?: string | null
+  cancellationReason?: string
+}
+
+export interface DriverEarnings {
+  count: number
+  totalEarnings: number
+  todayEarnings: number
+  weekEarnings: number
+  totalRides: number
+  completedRides: number
+  cancelledRides: number
+  rides: any[]
 }
 
 /**
@@ -85,10 +110,50 @@ export async function getMyRides() {
 }
 
 /**
+ * Fetch customer's current active ride (if any).
+ */
+export async function getActiveRide(): Promise<any | null> {
+  const res = await api.get<{ success: boolean; ride: any | null }>('/rides/active')
+  return res.data.ride
+}
+
+/**
  * Driver accepts an incoming ride.
  */
 export async function acceptRideBooking(rideId: string) {
   const res = await api.post(`/rides/${rideId}/accept`)
+  return res.data
+}
+
+/**
+ * Driver rejects an incoming ride request.
+ */
+export async function rejectRideBooking(rideId: string) {
+  const res = await api.post(`/rides/${rideId}/reject`)
+  return res.data
+}
+
+/**
+ * User or driver cancels a ride.
+ */
+export async function cancelRideBooking(rideId: string, reason?: string) {
+  const res = await api.post(`/rides/${rideId}/cancel`, { reason: reason || '' })
+  return res.data
+}
+
+/**
+ * Driver marks arrival at pickup location.
+ */
+export async function markDriverArrived(rideId: string) {
+  const res = await api.post(`/rides/${rideId}/arrived`)
+  return res.data
+}
+
+/**
+ * Driver starts the ride (with optional PIN verification).
+ */
+export async function startRideBooking(rideId: string, pin?: string) {
+  const res = await api.post(`/rides/${rideId}/start`, { pin })
   return res.data
 }
 
@@ -103,7 +168,75 @@ export async function completeRideBooking(rideId: string) {
 /**
  * Fetch past rides & shift earnings for logged-in driver.
  */
-export async function getDriverRideHistory() {
-  const res = await api.get<{ success: boolean; count: number; totalEarnings: number; rides: any[] }>('/rides/driver-history')
+export async function getDriverRideHistory(): Promise<DriverEarnings> {
+  const res = await api.get<DriverEarnings & { success: boolean }>('/rides/driver-history')
+  return res.data
+}
+
+/**
+ * Fetch driver's currently active ride (if any).
+ */
+export async function getDriverActiveRide(): Promise<any | null> {
+  const res = await api.get<{ success: boolean; ride: any | null }>('/rides/driver-active')
+  return res.data.ride
+}
+
+/**
+ * Admin: Fetch all rides with optional status filter.
+ */
+export async function getAllRides(status?: string, page = 1, limit = 50) {
+  const params = new URLSearchParams({ page: String(page), limit: String(limit) })
+  if (status) params.set('status', status)
+  const res = await api.get<{ success: boolean; total: number; rides: any[] }>(`/rides/all?${params}`)
+  return res.data
+}
+
+/**
+ * Fetch open available ride requests for drivers.
+ */
+export async function getAvailableRides(): Promise<any[]> {
+  const res = await api.get<{ success: boolean; rides: any[] }>('/rides/available')
+  return res.data.rides || []
+}
+
+/**
+ * Persist driver online/offline status to the database.
+ * This ensures the status survives page refreshes.
+ */
+export async function setDriverOnlineStatus(status: 'ONLINE' | 'OFFLINE'): Promise<{ onlineStatus: string }> {
+  const res = await api.patch<{ success: boolean; onlineStatus: string }>('/employees/me/status', { status })
+  return res.data
+}
+
+/**
+ * Fetch the driver's current persisted online status and location from the database.
+ */
+export async function getDriverOnlineStatus(): Promise<{
+  onlineStatus: string
+  availabilityStatus: string
+  currentLocation?: { lat: number; lng: number; heading?: number; speed?: number }
+  location?: { type: string; coordinates: [number, number] }
+  vehicleCategory?: string
+  name?: string
+}> {
+  const res = await api.get('/employees/me/status')
+  return res.data
+}
+
+/**
+ * Push driver GPS coordinates to the database via REST.
+ * This is the fallback path when the socket connection is unreliable.
+ * The primary path is the socket 'driver:location_update' event (every 5s).
+ * This REST call fires every ~10s (every 2nd socket tick).
+ *
+ * GeoJSON note: backend stores as [lng, lat] — this function sends lat/lng separately.
+ */
+export async function updateDriverLocation(
+  lat: number,
+  lng: number,
+  heading = 0,
+  speed   = 0,
+): Promise<{ success: boolean }> {
+  const res = await api.patch<{ success: boolean }>('/employees/me/location', { lat, lng, heading, speed })
   return res.data
 }
